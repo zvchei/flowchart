@@ -1,0 +1,19 @@
+{
+  "name": "flowchart",
+  "version": "0.0.0",
+  "description": "A `.flowchart` file contains a JSON object that fully describes a set of processes and the connections between them.",
+  "main": "main.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "tsx ."
+  },
+  "author": "zvchei",
+  "license": "",
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "tsx": "^4.20.3"
+  },
+  "dependencies": {
+    "json-schema-library": "^10.1.2"
+  }
+}
