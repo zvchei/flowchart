@@ -1,0 +1,64 @@
+{
+  "nodes": {
+    "start": {
+      "component": "Start",
+      "inputs": {},
+      "outputs": {
+        "out": {}
+      },
+      "settings": {
+        "value": {},
+        "definition": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    "end": {
+      "component": "End",
+      "inputs": {
+        "in": {}
+      },
+      "outputs": {},
+      "settings": {
+        "value": {},
+        "definition": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    "process1": {
+      "component": "Process",
+      "inputs": {
+        "in1": {},
+		"in2": {}
+      },
+      "outputs": {
+        "out": {}
+      },
+      "settings": {
+        "value": {
+          "label": "Step 1"
+        },
+        "definition": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string" }
+          },
+          "required": ["label"]
+        }
+      }
+    }
+  },
+  "connections": {
+    "c1": {
+      "from": { "node": "start", "connector": "out" },
+      "to": { "node": "process1", "connector": "in2" }
+    },
+    "c2": {
+      "from": { "node": "process1", "connector": "out" },
+      "to": { "node": "end", "connector": "in" }
+    }
+  }
+}

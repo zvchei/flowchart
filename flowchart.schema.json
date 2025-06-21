@@ -1,0 +1,111 @@
+{
+	"$schema": "http://json-schema.org/draft/2020-12/schema#",
+	"$id": "https://1inkz.com/flowchart.schema.json",
+	"title": "Flowchart",
+	"description": "A Flowchart fully describes a set of processes and the connections between them",
+	"type": "object",
+	"required": [
+		"nodes",
+		"connections"
+	],
+	"$defs": {
+		"connector": {
+			"type": "object",
+			"required": [
+				"node",
+				"connector"
+			],
+			"properties": {
+				"node": {
+					"type": "string",
+					"$comment": "Identifier of the node from which the connection originates"
+				},
+				"connector": {
+					"type": "string",
+					"$comment": "Identifier of the output of the originating node"
+				}
+			}
+		},
+		"connection": {
+			"type": "object",
+			"required": [
+				"from",
+				"to"
+			],
+			"properties": {
+				"from": {
+					"$ref": "#/$defs/connector#"
+				},
+				"to": {
+					"$ref": "#/$defs/connector#"
+				}
+			}
+		},
+		"connectorSchema": {
+			"$ref": "https://json-schema.org/draft/2020-12/schema#",
+			"$comment": "Definition of the data type of a connector"
+		},
+		"node": {
+			"type": "object",
+			"required": [
+				"component",
+				"inputs",
+				"settings"
+			],
+			"properties": {
+				"component": {
+					"type": "string",
+					"$comment": "Component type of the node"
+				},
+				"inputs": {
+					"type": "object",
+					"$comment": "Definitions of the inputs of the node",
+					"unevaluatedProperties": {
+						"$ref": "#/$defs/connectorSchema#"
+					}
+				},
+				"outputs": {
+					"type": "object",
+					"$comment": "Definitions of the outputs of the node",
+					"unevaluatedProperties": {
+						"$ref": "#/$defs/connectorSchema#"
+					}
+				},
+				"settings": {
+					"type": "object",
+					"$comment": "The settings of the node and their definition",
+					"required": [
+						"value",
+						"definition"
+					],
+					"properties": {
+						"value": {
+							"type": "object",
+							"$comment": "The initial value of the settings, must conform to the definition",
+							"additionalProperties": true
+						},
+						"definition": {
+							"$ref": "https://json-schema.org/draft/2020-12/schema#",
+							"$comment": "Definition of the settings data type"
+						}
+					}
+				}
+			}
+		}
+	},
+	"properties": {
+		"nodes": {
+			"type": "object",
+			"unevaluatedProperties": {
+				"$ref": "#/$defs/node#"
+			}
+		},
+		"connections": {
+			"type": "object",
+			"unevaluatedProperties": {
+				"$ref": "#/$defs/connection#"
+			}
+		}
+	},
+	"additionalProperties": false
+}
