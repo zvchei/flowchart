@@ -4,13 +4,16 @@
   "description": "A `.flowchart` file contains a JSON object that fully describes a set of processes and the connections between them.",
   "main": "main.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "start": "tsx ."
   },
   "author": "zvchei",
   "license": "",
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.0.3",
+    "jest": "^30.0.2",
+    "ts-jest": "^29.4.0",
     "tsx": "^4.20.3"
   },
   "dependencies": {
