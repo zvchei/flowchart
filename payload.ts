@@ -1,6 +1,9 @@
 import type { Node } from './flowchart';
 
-export class Payload extends Map<string, any> {
+// TODO: Split mutex and payload management into separate classes
+
+export class Payload {
+	data: Map<string, any>;
 	private resolve: (value?: void | PromiseLike<void>) => void;
 
 	/** 
@@ -10,10 +13,8 @@ export class Payload extends Map<string, any> {
 	ready: Promise<void>;
 
 	constructor(private fields: string[] = []) {
-		super();
-		this.ready = new Promise<void>((resolve) => {
-			this.resolve = resolve;
-		});
+		this.data = new Map<string, any>();
+		this.reset();
 	}
 
 	/** 
@@ -21,22 +22,26 @@ export class Payload extends Map<string, any> {
 	 * @returns {boolean}
 	 */
 	get complete(): boolean {
-		return this.fields.every(key => this.has(key));
+		return this.fields.every(key => this.data.has(key));
 	}
 
-	/**
-	 * Sets the data for a specific key and resolves the ready promise if complete
-	 * @param {string} key - The key name
-	 * @param {any} data - The data to set
-	 * @returns {this}
-	 */
-	set(key: string, data: any): this {
-		super.set(key, data);
-		
-		if (this.complete) {
-			this.resolve();
+	async set(key: string, value: any): Promise<void> {
+		if (this.data.has(key)) {
+			await this.ready;
 		}
+		
+		this.data.set(key, value);
+	}
 
-		return this;
+	release(): void {
+		this.data.clear();
+		this.resolve();
+		this.reset();
+	}
+
+	private reset(): void {
+		this.ready = new Promise<void>((resolve) => {
+			this.resolve = resolve;
+		});
 	}
 }
