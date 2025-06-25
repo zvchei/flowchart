@@ -1,5 +1,3 @@
-import type { Node } from './flowchart';
-
 // TODO: Split mutex and payload management into separate classes
 
 export class Payload {
@@ -26,6 +24,8 @@ export class Payload {
 	}
 
 	async set(key: string, value: any): Promise<void> {
+		// TODO: Handle case where key is not in fields. Show warning?
+
 		if (this.data.has(key)) {
 			await this.ready;
 		}
