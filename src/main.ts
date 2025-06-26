@@ -1,7 +1,9 @@
+import type { Connection, Flowchart } from './flowchart';
+import type { Schema } from './schema.d';
 import { compileSchema, SchemaNode } from 'json-schema-library';
 import myJsonSchema from './flowchart.schema.json' assert { type: 'json' };
 import { promises as fs } from 'fs';
-import type { Connection, Flowchart, ConnectorSchema } from './flowchart';
+import { areSchemasCompatible } from './schema';
 
 /**
  * Reads JSON from stdin.
@@ -16,13 +18,13 @@ async function readStdin(): Promise<any> {
 }
 
 /**
- * Gets the connectors for a connection.
+ * Gets the connectors of a connection.
  * @param connection The connection object.
  * @param nodes The nodes in the flowchart.
  * @returns The source and destination connectors, or null if not found.
  */
 function getConnectors(connection: Connection, nodes: Flowchart['nodes'])
-	: { from: ConnectorSchema | null; to: ConnectorSchema | null; errors: Error[] } {
+	: { from: Schema | null; to: Schema | null; errors: Error[] } {
 	const fromNode = nodes[connection.from.node];
 	const toNode = nodes[connection.to.node];
 	const errors: Error[] = [];
@@ -43,47 +45,14 @@ function getConnectors(connection: Connection, nodes: Flowchart['nodes'])
 	if (!to) {
 		errors.push(new Error(`Input '${connection.to.connector}' not found on node '${connection.to.node}'`));
 	}
-
+	
 	return { from, to, errors };
 }
 
-/**
- * Checks if the connectors are compatible.
- * @param from The source connector.
- * @param to The destination connector.
- * @returns An object indicating if the connectors are compatible and any errors.
- */
-function areConnectorsCompatible(from: ConnectorSchema, to: ConnectorSchema)
-	: { valid: boolean; errors: Error[] } {
-	const errors: Error[] = [];
-
-	if (from.type !== to.type) {
-		errors.push(new Error(`Incompatible types: '${from.type}' cannot connect to '${to.type}'`));
-	}
-
-	if (from.$ref !== to.$ref) {
-		errors.push(new Error(`Incompatible references: '${from.$ref}' cannot connect to '${to.$ref}'`));
-	}
-
-	// Check if the requred properties match
-	if (from.required && to.required) {
-		for (const name of to.required) {
-			if (!from.required.includes(name)) {
-				errors.push(new Error(`Required property '${name}' is missing in source connector`));
-			}
-
-			const { errors: propertyErrors } = areConnectorsCompatible(from.properties[name], to.properties[name]);
-			errors.push(...propertyErrors);
-		}
-	}
-
-	return { valid: errors.length === 0, errors };
-}
-
-function printErrors(message: string, errors: Error[]): void {
+function printErrors(message: string, errors: string[]): void {
 	console.error(message);
 	errors.forEach((error) => {
-		console.error(`- ${error.message}`);
+		console.error(`- ${error}`);
 	});
 }
 
@@ -103,19 +72,19 @@ async function main() {
 
 	const { valid, errors } = schema.validate(flowchart);
 	if (!valid) {
-		printErrors('Flowchart is invalid:', errors.map(e => new Error(e.message)));
+		printErrors('Flowchart is invalid:', errors.map(e => e.message));
 		process.exit(1);
 	}
 
 	for (const [id, connection] of Object.entries(flowchart.connections)) {
 		const { from, to, errors } = getConnectors(connection, flowchart.nodes);
 		if (!from || !to) {
-			printErrors(`Connection '${id}' is invalid:`, errors);
+			printErrors(`Connection '${id}' is invalid:`, errors.map(e => e.message));
 			process.exit(1);
 		} else {
 			{
-				const { valid, errors } = areConnectorsCompatible(from, to);
-				if (!valid) {
+				const { compatible, errors } = areSchemasCompatible(from, to);
+				if (!compatible) {
 					printErrors(`Connection '${id}' is incompatible:`, errors);
 					process.exit(1);
 				}
@@ -124,8 +93,6 @@ async function main() {
 	}
 
 	// If we reach here, the flowchart is valid
-
-	
 }
 
 main();

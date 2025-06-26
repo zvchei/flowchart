@@ -1,16 +1,21 @@
+import type { Schema, ObjectSchema } from './schema.d';
+
 export type Flowchart = {
 	nodes: Record<string, Node>;
 	connections: Record<string, Connection>;
 };
 
 export type Node = {
-	component: string;
-	inputs: Record<string, ConnectorSchema>;
-	outputs: Record<string, ConnectorSchema>;
-	settings: Record<string, any>;
+	type: string;
+	inputs: Record<string, Schema>;
+	outputs: Record<string, Schema>;
+	settings: Record<string, Schema>;
 };
 
-export type ConnectorSchema = Record<string, any>; // JSON schema of the data type of the connector
+export type Settings = ObjectSchema & {
+	required: ObjectSchema['required'];
+	properties: ObjectSchema['properties'];
+};
 
 export type Connection = {
 	from: Connector;
