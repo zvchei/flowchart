@@ -24,12 +24,15 @@ export class Payload {
 	}
 
 	async set(key: string, value: any): Promise<void> {
-		// TODO: Handle case where key is not in fields. Show warning?
+		// TODO: Improve the error handling here
+		if (!this.fields.includes(key)) {
+			console.warn(`Attempting to set field with key "${key}" that is not in the fields list: [${this.fields.join(', ')}]`);
+		}
 
 		if (this.data.has(key)) {
 			await this.ready;
 		}
-		
+
 		this.data.set(key, value);
 	}
 
