@@ -3,6 +3,16 @@ import type { Flowchart, NodeClass } from './flowchart';
 import { areSchemasCompatible, validateConnections } from './schema';
 
 describe('areSchemasCompatible', () => {
+	let consoleWarnSpy: jest.SpyInstance;
+
+	beforeAll(() => {
+		consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+	});
+
+	afterAll(() => {
+		consoleWarnSpy.mockRestore();
+	});
+
 	it('returns true for identical primitive types', () => {
 		const from: Schema = { type: 'string' };
 		const to: Schema = { type: 'string' };
