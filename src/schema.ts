@@ -6,9 +6,62 @@
  * @returns An object indicating if the schemas are compatible and a list of errors if any.
 */
 import type { Schema } from './schema.d';
+import type { Flowchart, NodeClass } from './flowchart';
+
+export function validateConnections(connections: Flowchart['connections'], nodeClasses: Record<string, NodeClass>)
+	: { valid: boolean; errors: string[] } {
+	const errors: string[] = [];
+
+	for (const [id, connection] of Object.entries(connections)) {
+
+		const fromNode = nodeClasses[connection.from.node];
+		const toNode = nodeClasses[connection.to.node];
+
+		if (!fromNode) {
+			errors.push(`Node with ID "${connection.from.node}" is not registered.`);
+		}
+
+		if (!toNode) {
+			errors.push(`Node with ID "${connection.to.node}" is not registered.`);
+		}
+
+		if (errors.length > 0) {
+			return { valid: false, errors };
+		}
+
+
+		const fromConnector = fromNode.outputs[connection.from.connector];
+		const toConnector = toNode.inputs[connection.to.connector];
+
+		if (!fromConnector) {
+			errors.push(`Output connector "${connection.from.connector}" on node "${connection.from.node}" is not defined.`);
+		}
+
+		if (!toConnector) {
+			errors.push(`Input connector "${connection.to.connector}" on node "${connection.to.node}" is not defined.`);
+		}
+
+		if (errors.length > 0) {
+			return { valid: false, errors };
+		}
+
+		if (fromConnector && toConnector) {
+			const {compatible, errors: compatibilityErrors} = areSchemasCompatible(fromConnector, toConnector);
+			if (!compatible) {
+				errors.push(...compatibilityErrors.map(err => `Connection "${id}": ${err}`));
+			}
+		}
+	}
+
+	return { valid: errors.length === 0, errors };
+}
 
 export function areSchemasCompatible(from: Schema, to: Schema): { compatible: boolean; errors: string[] } {
 	// TODO: Do proper error handling
+
+	if (to.type === 'any') {
+		return { compatible: true, errors: [] };
+	}
 
 	if (from.type !== to.type) {
 		return {
