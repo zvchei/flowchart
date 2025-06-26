@@ -4,9 +4,9 @@ export class Payload {
 	data: Map<string, any>;
 	private resolve: (value?: void | PromiseLike<void>) => void;
 
-	/** 
-	 * Promise that resolves when the payload is complete 
-	 * @type {Promise<void>} 
+	/**
+	 * Promise that resolves when the payload is complete
+	 * @type {Promise<void>}
 	 */
 	ready: Promise<void>;
 
@@ -15,15 +15,20 @@ export class Payload {
 		this.reset();
 	}
 
-	/** 
-	 * Returns true if all fields are set 
+	/**
+	 * Returns true if all fields are set
 	 * @returns {boolean}
 	 */
 	get complete(): boolean {
 		return this.fields.every(key => this.data.has(key));
 	}
 
-	async set(key: string, value: any): Promise<void> {
+	/**
+	 * Sets a value for a given key in the payload.
+	 * If the key already exists, it will wait for the payload to be released before setting the value.
+	 * @returns {Promise<boolean>} `true` if the payload is complete and ready to be processed.
+	 */
+	async set(key: string, value: any): Promise<boolean> {
 		// TODO: Improve the error handling here
 		if (!this.fields.includes(key)) {
 			console.warn(`Attempting to set field with key "${key}" that is not in the fields list: [${this.fields.join(', ')}]`);
@@ -34,6 +39,7 @@ export class Payload {
 		}
 
 		this.data.set(key, value);
+		return this.complete;
 	}
 
 	release(): void {

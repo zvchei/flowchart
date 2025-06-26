@@ -48,4 +48,17 @@ describe('Payload', () => {
 		await new Promise<void>(resolve => setTimeout(resolve, 1));
 		expect(setTwoResolved).toBe(true);
 	});
+
+	it('set() should return completion status', async () => {
+		const payload = new Payload(['a', 'b', 'c']);
+		
+		const result1 = await payload.set('a', 1);
+		expect(result1).toBe(false);
+		
+		const result2 = await payload.set('b', 2);
+		expect(result2).toBe(false);
+		
+		const result3 = await payload.set('c', 3);
+		expect(result3).toBe(true);
+	});
 });
