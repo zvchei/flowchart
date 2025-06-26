@@ -1,64 +1,33 @@
 {
   "nodes": {
     "start": {
-      "component": "Start",
-      "inputs": {},
-      "outputs": {
-        "out": {}
-      },
+      "type": "textDecorator",
       "settings": {
-        "value": {},
-        "definition": {
-          "type": "object",
-          "properties": {}
-        }
+        "mode": "uppercase"
+      }
+    },
+    "middle": {
+      "type": "textDecorator",
+      "settings": {
+        "mode": "lowercase"
       }
     },
     "end": {
-      "component": "End",
-      "inputs": {
-        "in": {}
-      },
-      "outputs": {},
-      "settings": {
-        "value": {},
-        "definition": {
-          "type": "object",
-          "properties": {}
-        }
-      }
-    },
-    "process1": {
-      "component": "Process",
-      "inputs": {
-        "in1": {},
-		"in2": {}
-      },
-      "outputs": {
-        "out": {}
-      },
-      "settings": {
-        "value": {
-          "label": "Step 1"
-        },
-        "definition": {
-          "type": "object",
-          "properties": {
-            "label": { "type": "string" }
-          },
-          "required": ["label"]
-        }
-      }
+      "type": "printer"
     }
   },
   "connections": {
     "c1": {
-      "from": { "node": "start", "connector": "out" },
-      "to": { "node": "process1", "connector": "in2" }
+      "from": { "node": "start", "connector": "text" },
+      "to": { "node": "middle", "connector": "text" }
     },
     "c2": {
-      "from": { "node": "process1", "connector": "out" },
-      "to": { "node": "end", "connector": "in" }
+      "from": { "node": "middle", "connector": "text" },
+      "to": { "node": "end", "connector": "data" }
+    },
+    "c3": {
+      "from": { "node": "start", "connector": "text" },
+      "to": { "node": "end", "connector": "data" }
     }
   }
 }

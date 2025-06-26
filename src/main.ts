@@ -1,9 +1,9 @@
-import type { Connection, Flowchart } from './flowchart';
-import type { Schema } from './schema.d';
-import { compileSchema, SchemaNode } from 'json-schema-library';
-import myJsonSchema from './flowchart.schema.json' assert { type: 'json' };
+import type { Flowchart, NodeClass } from './flowchart';
+import { compileSchema } from 'json-schema-library';
+import flowchartSchemaDefinition from './flowchart.schema.json' assert { type: 'json' };
 import { promises as fs } from 'fs';
-import { areSchemasCompatible } from './schema';
+import { areSchemasCompatible, validateConnections } from './schema';
+import { NodeAdapter } from './node-adapter';
 
 /**
  * Reads JSON from stdin.
@@ -17,38 +17,6 @@ async function readStdin(): Promise<any> {
 	return Buffer.concat(chunks).toString('utf8');
 }
 
-/**
- * Gets the connectors of a connection.
- * @param connection The connection object.
- * @param nodes The nodes in the flowchart.
- * @returns The source and destination connectors, or null if not found.
- */
-function getConnectors(connection: Connection, nodes: Flowchart['nodes'])
-	: { from: Schema | null; to: Schema | null; errors: Error[] } {
-	const fromNode = nodes[connection.from.node];
-	const toNode = nodes[connection.to.node];
-	const errors: Error[] = [];
-
-	if (!fromNode) {
-		errors.push(new Error(`Source node '${connection.from.node}' not found`));
-	}
-	if (!toNode) {
-		errors.push(new Error(`Destination node '${connection.to.node}' not found`));
-	}
-
-	const from = fromNode ? fromNode.outputs[connection.from.connector] : null;
-	const to = toNode ? toNode.inputs[connection.to.connector] : null;
-
-	if (!from) {
-		errors.push(new Error(`Output '${connection.from.connector}' not found on node '${connection.from.node}'`));
-	}
-	if (!to) {
-		errors.push(new Error(`Input '${connection.to.connector}' not found on node '${connection.to.node}'`));
-	}
-	
-	return { from, to, errors };
-}
-
 function printErrors(message: string, errors: string[]): void {
 	console.error(message);
 	errors.forEach((error) => {
@@ -56,11 +24,50 @@ function printErrors(message: string, errors: string[]): void {
 	});
 }
 
+const nodeRegistry: Record<string, NodeClass> = {
+	textDecorator: {
+		inputs: {
+			text: { type: 'string' }
+		},
+		outputs: {
+			text: { type: 'string' }
+		},
+		settings: {
+			type: 'object',
+			required: ['mode'],
+			properties: {
+				mode: { type: 'string' }
+			}
+		},
+		getInstance(settings) {
+			return {
+				run: async ({ text }: { text: string }) => {
+					return { text: settings.mode === 'uppercase' ? text.toUpperCase() : text.toLowerCase() };
+				}
+			}
+		}
+	},
+	printer: {
+		inputs: {
+			data: { type: 'any' },
+		},
+		outputs: {},
+		settings: { type: 'null' },
+		getInstance(settings) {
+			return {
+				run: async ({ data }: Record<string, any>) => {
+					console.log(data);
+				}
+			};
+		}
+	}
+};
+
 /**
  * Entry point of the script.
  */
 async function main() {
-	const schema = compileSchema(myJsonSchema);
+	const flowchartSchema = compileSchema(flowchartSchemaDefinition);
 
 	let input: string = await (
 		process.argv.length > 2
@@ -70,29 +77,87 @@ async function main() {
 
 	const flowchart = JSON.parse(input) as Flowchart;
 
-	const { valid, errors } = schema.validate(flowchart);
-	if (!valid) {
-		printErrors('Flowchart is invalid:', errors.map(e => e.message));
-		process.exit(1);
-	}
-
-	for (const [id, connection] of Object.entries(flowchart.connections)) {
-		const { from, to, errors } = getConnectors(connection, flowchart.nodes);
-		if (!from || !to) {
-			printErrors(`Connection '${id}' is invalid:`, errors.map(e => e.message));
+	{
+		const { valid, errors } = flowchartSchema.validate(flowchart);
+		if (!valid) {
+			printErrors('Flowchart is invalid:', errors.map(e => e.message));
 			process.exit(1);
-		} else {
-			{
-				const { compatible, errors } = areSchemasCompatible(from, to);
-				if (!compatible) {
-					printErrors(`Connection '${id}' is incompatible:`, errors);
-					process.exit(1);
-				}
-			}
 		}
 	}
 
-	// If we reach here, the flowchart is valid
+	const nodeClasses = Object.fromEntries(
+		Object.entries(flowchart.nodes).map(([id, node]) => {
+			const nodeClass: NodeClass = nodeRegistry[node.type];
+
+			if (!nodeClass) {
+				printErrors(`Node type "${node.type}" is not registered:`, [
+					`Node with ID "${id}" has an unregistered type "${node.type}".`
+				]);
+				process.exit(1);
+			}
+
+			const settingsSchema = compileSchema(nodeClass.settings);
+			const { valid, errors } = settingsSchema.validate(node.settings);
+			if (!valid) {
+				printErrors(`Settings for node "${id}" are invalid:`, errors.map(e => e.message));
+				process.exit(1);
+			}
+
+			return [id, nodeClass];
+		})
+	);
+
+	const activeNodes: Map<string, NodeAdapter> = new Map();
+
+	{
+		const { valid, errors } = validateConnections(flowchart.connections, nodeClasses);
+		if (!valid) {
+			printErrors('Connection validation errors found:', errors);
+			process.exit(1);
+		}
+	}
+
+	const activeOutputs = Object
+		.values(flowchart.connections)
+		.reduce((collection, connection) => {
+			// TODO: Handle unhandled outputs more gracefully
+			// TODO: Use a better error handling mechanism
+			const { node, connector } = connection.from;
+
+			if (!collection[node]) {
+				collection[node] = {};
+			}
+
+			if (!collection[node][connector]) {
+				collection[node][connector] = [];
+			}
+
+			collection[node][connector].push(async (value: any) => {
+				const node = activeNodes.get(connection.to.node);
+				node!.input(connection.to.connector, value);
+			});
+
+			return collection;
+		}, {});
+
+	for (const [nodeId, nodeClass] of Object.entries(nodeClasses)) {
+		const settings = flowchart.nodes[nodeId].settings;
+		const inputNames = Object.keys(nodeClass.inputs);
+		const outputFunctions = activeOutputs[nodeId];
+
+		const activeNode = new NodeAdapter(
+			nodeId,
+			nodeClass.getInstance(settings),
+			inputNames,
+			outputFunctions
+		);
+
+		activeNodes.set(nodeId, activeNode);
+	}
+
+	const query = 'Hello, World!';
+	console.log(query);
+	await activeNodes.get('start')!.input('text', query);
 }
 
 main();

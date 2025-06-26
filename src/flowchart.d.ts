@@ -7,10 +7,19 @@ export type Flowchart = {
 
 export type Node = {
 	type: string;
+	settings: any;
+};
+
+export interface NodeClass {
 	inputs: Record<string, Schema>;
 	outputs: Record<string, Schema>;
-	settings: Record<string, Schema>;
-};
+	settings: Schema;
+	getInstance(settings: any, /* outputs */): NodeInstance;
+}
+
+export interface NodeInstance {
+	run(values: Record<string, any>): Promise<Record<string, any> | void>;
+}
 
 export type Settings = ObjectSchema & {
 	required: ObjectSchema['required'];
