@@ -102,6 +102,7 @@ async function runFlowchart(flowchartPath: string, input?: string) {
 		console.error('Error running flowchart:', error);
 		process.exit(1);
 	}
+}
 
 function findEntryNodes(flowchart: FlowchartDefinition): string[] {
 	const targetNodes = new Set<string>();
