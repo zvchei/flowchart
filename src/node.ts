@@ -1,20 +1,21 @@
-import type { NodeInstance } from './flowchart.d';
+import type { Component } from './flowchart.d';
 import { Payload } from './payload';
 
-export interface Sink {
+export interface OutputSink {
 	(value: any): Promise<void>;
 }
 
-export class NodeAdapter {
+export class NodeInstance {
 	private payload: Payload;
 
 	constructor(
 		private readonly id: string,
-		private component: NodeInstance,
-		inputs: string[],
-		private outputs: Record<string, Sink[]>
+		private component: Component,
+		private outputs: Record<string, OutputSink[]>
 	) {
 		// TODO: Improved error handling
+		const inputs = Object.keys(component.inputs || {});
+
 		if (inputs?.length === 0) {
 			throw new Error(`Node ${id} must have at least one input.`);
 		}

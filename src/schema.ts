@@ -6,16 +6,16 @@
  * @returns An object indicating if the schemas are compatible and a list of errors if any.
 */
 import type { Schema } from './schema.d';
-import type { Flowchart, NodeClass } from './flowchart';
+import type { FlowchartDefinition, Component } from './flowchart.d';
 
-export function validateConnections(connections: Flowchart['connections'], nodeClasses: Record<string, NodeClass>)
+export function validateConnections(connections: FlowchartDefinition['connections'], nodeInstances: Record<string, Component>)
 	: { valid: boolean; errors: string[] } {
 	const errors: string[] = [];
 
 	for (const [id, connection] of Object.entries(connections)) {
 
-		const fromNode = nodeClasses[connection.from.node];
-		const toNode = nodeClasses[connection.to.node];
+		const fromNode = nodeInstances[connection.from.node];
+		const toNode = nodeInstances[connection.to.node];
 
 		if (!fromNode) {
 			errors.push(`Node with ID "${connection.from.node}" is not registered.`);
@@ -46,7 +46,7 @@ export function validateConnections(connections: Flowchart['connections'], nodeC
 		}
 
 		if (fromConnector && toConnector) {
-			const {compatible, errors: compatibilityErrors} = areSchemasCompatible(fromConnector, toConnector);
+			const { compatible, errors: compatibilityErrors } = areSchemasCompatible(fromConnector, toConnector);
 			if (!compatible) {
 				errors.push(...compatibilityErrors.map(err => `Connection "${id}": ${err}`));
 			}
@@ -82,7 +82,7 @@ export function areSchemasCompatible(from: Schema, to: Schema): { compatible: bo
 
 	// Note that the 'or' operator is used as type guard. The check for matching types should be already done above.
 	if (from.type !== 'object' || to.type !== 'object') return { compatible: true, errors: [] };
-	
+
 	const errors: string[] = [];
 
 	if (to.required) {

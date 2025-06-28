@@ -1,163 +1,173 @@
-import type { Flowchart, NodeClass } from './flowchart';
-import { compileSchema } from 'json-schema-library';
-import flowchartSchemaDefinition from './flowchart.schema.json' assert { type: 'json' };
-import { promises as fs } from 'fs';
-import { areSchemasCompatible, validateConnections } from './schema';
-import { NodeAdapter } from './node-adapter';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as readline from 'readline';
+import { Flowchart } from './flowchart';
+import type { Component, FlowchartDefinition } from './flowchart.d';
 
-/**
- * Reads JSON from stdin.
- * @returns The parsed JSON object.
- */
+class TextDecoratorComponent implements Component {
+	readonly inputs = {
+		text: { type: 'string' as const }
+	};
+
+	readonly outputs = {
+		text: { type: 'string' as const }
+	};
+
+	readonly settings = {
+		type: 'object' as const,
+		properties: {
+			mode: { type: 'string' as const, enum: ['uppercase', 'lowercase'] }
+		},
+		required: ['mode']
+	};
+
+	constructor(private config: { mode: 'uppercase' | 'lowercase' }) { }
+
+	async run(values: Record<string, any>): Promise<Record<string, any>> {
+		const text = values.text as string;
+		const decoratedText = this.config.mode === 'uppercase'
+			? text.toUpperCase()
+			: text.toLowerCase();
+
+		return { text: decoratedText };
+	}
+}
+
+class PrinterComponent implements Component {
+	readonly inputs = {
+		data: { type: 'any' as const }
+	};
+
+	readonly outputs = {};
+
+	readonly settings = {
+		type: 'null' as const
+	};
+
+	async run(values: Record<string, any>): Promise<void> {
+		console.log('Output:', values.data);
+	}
+}
+
+class ComponentRegistry {
+	getInstance(nodeType: string, settings: any): Component {
+		switch (nodeType) {
+			case 'textDecorator':
+				return new TextDecoratorComponent(settings);
+			case 'printer':
+				return new PrinterComponent();
+			default:
+				throw new Error(`Unknown component type: ${nodeType}`);
+		}
+	}
+}
+
+async function runFlowchart(flowchartPath: string, input?: string) {
+	try {
+		const flowchartData = JSON.parse(fs.readFileSync(flowchartPath, 'utf-8')) as FlowchartDefinition;
+
+		const componentRegistry = new ComponentRegistry();
+		const flowchart = new Flowchart(componentRegistry);
+
+		for (const [nodeId, nodeDefinition] of Object.entries(flowchartData.nodes)) {
+			console.log(`Adding node: ${nodeId} (${nodeDefinition.type})`);
+			flowchart.addNode(nodeId, nodeDefinition);
+		}
+
+		for (const [connectionId, connection] of Object.entries(flowchartData.connections)) {
+			console.log(`Adding connection: ${connectionId}`);
+			flowchart.addConnection(connectionId, connection);
+		}
+
+		const entryNodes = findEntryNodes(flowchartData);
+		console.log(`Found entry nodes: ${entryNodes.join(', ')}`);
+
+		input = input || '';
+
+		console.log(`Starting execution with input: "${input}"`);
+
+		for (const nodeId of entryNodes) {
+			const node = flowchart.getNode(nodeId);
+			if (node) {
+				const inputNames = Object.keys(componentRegistry.getInstance(flowchartData.nodes[nodeId].type, flowchartData.nodes[nodeId].settings).inputs);
+				if (inputNames.length > 0) {
+					await node.input(inputNames[0], input);
+				}
+			}
+		}
+
+		console.log('Flowchart execution completed');
+
+	} catch (error) {
+		console.error('Error running flowchart:', error);
+		process.exit(1);
+	}
+
+function findEntryNodes(flowchart: FlowchartDefinition): string[] {
+	const targetNodes = new Set<string>();
+
+	for (const connection of Object.values(flowchart.connections)) {
+		targetNodes.add(connection.to.node);
+	}
+
+	const allNodes = Object.keys(flowchart.nodes);
+	return allNodes.filter(nodeId => !targetNodes.has(nodeId));
+}
+
 async function readStdin(): Promise<any> {
 	const chunks: Buffer[] = [];
 	for await (const chunk of process.stdin) {
 		chunks.push(chunk);
 	}
-	return Buffer.concat(chunks).toString('utf8');
+	return Buffer.concat(chunks).toString('utf8').trim();
 }
 
-function printErrors(message: string, errors: string[]): void {
-	console.error(message);
-	errors.forEach((error) => {
-		console.error(`- ${error}`);
+async function askUser(question: string): Promise<string> {
+	return new Promise((resolve) => {
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: process.stdout
+		});
+
+		rl.question(question, (answer) => {
+			rl.close();
+			resolve(answer.trim());
+		});
 	});
 }
 
-const nodeRegistry: Record<string, NodeClass> = {
-	textDecorator: {
-		inputs: {
-			text: { type: 'string' }
-		},
-		outputs: {
-			text: { type: 'string' }
-		},
-		settings: {
-			type: 'object',
-			required: ['mode'],
-			properties: {
-				mode: { type: 'string' }
-			}
-		},
-		getInstance(settings) {
-			return {
-				run: async ({ text }: { text: string }) => {
-					return { text: settings.mode === 'uppercase' ? text.toUpperCase() : text.toLowerCase() };
-				}
-			}
-		}
-	},
-	printer: {
-		inputs: {
-			data: { type: 'any' },
-		},
-		outputs: {},
-		settings: { type: 'null' },
-		getInstance(settings) {
-			return {
-				run: async ({ data }: Record<string, any>) => {
-					console.log(data);
-				}
-			};
-		}
+async function getInput(): Promise<string> {
+	if (process.stdin.isTTY) {
+		return askUser('Please enter input text: ');
 	}
-};
-
-/**
- * Entry point of the script.
- */
-async function main() {
-	const flowchartSchema = compileSchema(flowchartSchemaDefinition);
-
-	let input: string = await (
-		process.argv.length > 2
-			? await fs.readFile(process.argv[2], 'utf8')
-			: await readStdin()
-	);
-
-	const flowchart = JSON.parse(input) as Flowchart;
-
-	{
-		const { valid, errors } = flowchartSchema.validate(flowchart);
-		if (!valid) {
-			printErrors('Flowchart is invalid:', errors.map(e => e.message));
-			process.exit(1);
-		}
-	}
-
-	const nodeClasses = Object.fromEntries(
-		Object.entries(flowchart.nodes).map(([id, node]) => {
-			const nodeClass: NodeClass = nodeRegistry[node.type];
-
-			if (!nodeClass) {
-				printErrors(`Node type "${node.type}" is not registered:`, [
-					`Node with ID "${id}" has an unregistered type "${node.type}".`
-				]);
-				process.exit(1);
-			}
-
-			const settingsSchema = compileSchema(nodeClass.settings);
-			const { valid, errors } = settingsSchema.validate(node.settings);
-			if (!valid) {
-				printErrors(`Settings for node "${id}" are invalid:`, errors.map(e => e.message));
-				process.exit(1);
-			}
-
-			return [id, nodeClass];
-		})
-	);
-
-	const activeNodes: Map<string, NodeAdapter> = new Map();
-
-	{
-		const { valid, errors } = validateConnections(flowchart.connections, nodeClasses);
-		if (!valid) {
-			printErrors('Connection validation errors found:', errors);
-			process.exit(1);
-		}
-	}
-
-	const activeOutputs = Object
-		.values(flowchart.connections)
-		.reduce((collection, connection) => {
-			// TODO: Handle unhandled outputs more gracefully
-			// TODO: Use a better error handling mechanism
-			const { node, connector } = connection.from;
-
-			if (!collection[node]) {
-				collection[node] = {};
-			}
-
-			if (!collection[node][connector]) {
-				collection[node][connector] = [];
-			}
-
-			collection[node][connector].push(async (value: any) => {
-				const node = activeNodes.get(connection.to.node);
-				node!.input(connection.to.connector, value);
-			});
-
-			return collection;
-		}, {});
-
-	for (const [nodeId, nodeClass] of Object.entries(nodeClasses)) {
-		const settings = flowchart.nodes[nodeId].settings;
-		const inputNames = Object.keys(nodeClass.inputs);
-		const outputFunctions = activeOutputs[nodeId];
-
-		const activeNode = new NodeAdapter(
-			nodeId,
-			nodeClass.getInstance(settings),
-			inputNames,
-			outputFunctions
-		);
-
-		activeNodes.set(nodeId, activeNode);
-	}
-
-	const query = 'Hello, World!';
-	console.log(query);
-	await activeNodes.get('start')!.input('text', query);
+	return readStdin();
 }
 
-main();
+function main() {
+	const args = process.argv.slice(2);
+
+	if (args.length === 0) {
+		console.log('Usage: npm start [flowchart-file]');
+		console.log('       npm start [flowchart-file] < input.txt');
+		console.log('       echo "input text" | npm start [flowchart-file]');
+		console.log('Example: npm start example.flowchart.json');
+		return;
+	}
+
+	const flowchartFile = args[0];
+
+	const flowchartPath = path.resolve(flowchartFile);
+
+	if (!fs.existsSync(flowchartPath)) {
+		console.error(`Flowchart file not found: ${flowchartPath}`);
+		process.exit(1);
+	}
+
+	getInput().then(input => {
+		runFlowchart(flowchartPath, input);
+	});
+}
+
+if (require.main === module) {
+	main();
+}

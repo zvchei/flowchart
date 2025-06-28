@@ -1,5 +1,5 @@
 import type { Schema } from './schema.d';
-import type { Flowchart, NodeClass } from './flowchart';
+import type { FlowchartDefinition, Component } from './flowchart.d';
 import { areSchemasCompatible, validateConnections } from './schema';
 
 describe('areSchemasCompatible', () => {
@@ -136,7 +136,7 @@ describe('areSchemasCompatible', () => {
 });
 
 describe('validateConnections', () => {
-	const mockNodeClasses: Record<string, NodeClass> = {
+	const mockComponents: Record<string, Component> = {
 		textProcessor: {
 			inputs: {
 				text: { type: 'string' }
@@ -145,7 +145,7 @@ describe('validateConnections', () => {
 				processedText: { type: 'string' }
 			},
 			settings: { type: 'null' },
-			getInstance: () => ({ run: async () => ({}) })
+			run: async () => ({})
 		},
 		numberProcessor: {
 			inputs: {
@@ -155,7 +155,7 @@ describe('validateConnections', () => {
 				result: { type: 'number' }
 			},
 			settings: { type: 'null' },
-			getInstance: () => ({ run: async () => ({}) })
+			run: async () => ({})
 		},
 		printer: {
 			inputs: {
@@ -163,103 +163,103 @@ describe('validateConnections', () => {
 			},
 			outputs: {},
 			settings: { type: 'null' },
-			getInstance: () => ({ run: async () => ({}) })
+			run: async () => ({})
 		}
 	};
 
 	it('should return valid for correct connections', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'textProcessor', connector: 'processedText' },
 				to: { node: 'printer', connector: 'data' }
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(true);
 		expect(result.errors).toEqual([]);
 	});
 
 	it('should return invalid when from node is not registered', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'nonExistentNode', connector: 'output' },
 				to: { node: 'printer', connector: 'data' }
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(false);
 		expect(result.errors).toContain('Node with ID "nonExistentNode" is not registered.');
 	});
 
 	it('should return invalid when to node is not registered', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'textProcessor', connector: 'processedText' },
 				to: { node: 'nonExistentNode', connector: 'input' }
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(false);
 		expect(result.errors).toContain('Node with ID "nonExistentNode" is not registered.');
 	});
 
 	it('should return invalid when from connector does not exist', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'textProcessor', connector: 'nonExistentOutput' },
 				to: { node: 'printer', connector: 'data' }
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(false);
 		expect(result.errors).toContain('Output connector "nonExistentOutput" on node "textProcessor" is not defined.');
 	});
 
 	it('should return invalid when to connector does not exist', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'textProcessor', connector: 'processedText' },
 				to: { node: 'printer', connector: 'nonExistentInput' }
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(false);
 		expect(result.errors).toContain('Input connector "nonExistentInput" on node "printer" is not defined.');
 	});
 
 	it('should return invalid when connector types are incompatible', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'textProcessor', connector: 'processedText' },
 				to: { node: 'numberProcessor', connector: 'number' }
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(false);
 		expect(result.errors[0]).toMatch(/Connection "conn1": Incompatible types: 'string' cannot be assigned to 'number'/);
 	});
 
 	it('should return valid when connecting to any type', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'textProcessor', connector: 'processedText' },
 				to: { node: 'printer', connector: 'data' }
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(true);
 		expect(result.errors).toEqual([]);
 	});
 
 	it('should validate multiple connections', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'textProcessor', connector: 'processedText' },
 				to: { node: 'printer', connector: 'data' }
@@ -270,13 +270,13 @@ describe('validateConnections', () => {
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(true);
 		expect(result.errors).toEqual([]);
 	});
 
 	it('should return invalid with multiple connection errors', () => {
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'textProcessor', connector: 'processedText' },
 				to: { node: 'numberProcessor', connector: 'number' }
@@ -287,7 +287,7 @@ describe('validateConnections', () => {
 			}
 		};
 
-		const result = validateConnections(connections, mockNodeClasses);
+		const result = validateConnections(connections, mockComponents);
 		expect(result.valid).toBe(false);
 		expect(result.errors).toHaveLength(2);
 		expect(result.errors[0]).toMatch(/Connection "conn1": Incompatible types/);
@@ -295,7 +295,7 @@ describe('validateConnections', () => {
 	});
 
 	it('should handle complex object type compatibility', () => {
-		const complexNodeClasses: Record<string, NodeClass> = {
+		const complexComponents: Record<string, Component> = {
 			objectProducer: {
 				inputs: {},
 				outputs: {
@@ -309,7 +309,7 @@ describe('validateConnections', () => {
 					}
 				},
 				settings: { type: 'null' },
-				getInstance: () => ({ run: async () => ({}) })
+				run: async () => ({})
 			},
 			objectConsumer: {
 				inputs: {
@@ -323,24 +323,24 @@ describe('validateConnections', () => {
 				},
 				outputs: {},
 				settings: { type: 'null' },
-				getInstance: () => ({ run: async () => ({}) })
+				run: async () => ({})
 			}
 		};
 
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'objectProducer', connector: 'obj' },
 				to: { node: 'objectConsumer', connector: 'obj' }
 			}
 		};
 
-		const result = validateConnections(connections, complexNodeClasses);
+		const result = validateConnections(connections, complexComponents);
 		expect(result.valid).toBe(true);
 		expect(result.errors).toEqual([]);
 	});
 
 	it('should fail when object properties are incompatible', () => {
-		const complexNodeClasses: Record<string, NodeClass> = {
+		const complexComponents: Record<string, Component> = {
 			objectProducer: {
 				inputs: {},
 				outputs: {
@@ -354,7 +354,7 @@ describe('validateConnections', () => {
 					}
 				},
 				settings: { type: 'null' },
-				getInstance: () => ({ run: async () => ({}) })
+				run: async () => ({})
 			},
 			objectConsumer: {
 				inputs: {
@@ -369,24 +369,24 @@ describe('validateConnections', () => {
 				},
 				outputs: {},
 				settings: { type: 'null' },
-				getInstance: () => ({ run:	 async () => ({}) })
+				run:	 async () => ({})
 			}
 		};
 
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'objectProducer', connector: 'obj' },
 				to: { node: 'objectConsumer', connector: 'obj' }
 			}
 		};
 
-		const result = validateConnections(connections, complexNodeClasses);
+		const result = validateConnections(connections, complexComponents);
 		expect(result.valid).toBe(false);
 		expect(result.errors[0]).toMatch(/Connection "conn1": 'age': Incompatible types: 'number' cannot be assigned to 'string'/);
 	});
 
 	it('should fail when object has additional properties in strict mode', () => {
-		const complexNodeClasses: Record<string, NodeClass> = {
+		const complexComponents: Record<string, Component> = {
 			objectProducer: {
 				inputs: {},
 				outputs: {
@@ -401,7 +401,7 @@ describe('validateConnections', () => {
 					}
 				},
 				settings: { type: 'null' },
-				getInstance: () => ({ run: async () => ({}) })
+				run: async () => ({})
 			},
 			objectConsumer: {
 				inputs: {
@@ -416,18 +416,18 @@ describe('validateConnections', () => {
 				},
 				outputs: {},
 				settings: { type: 'null' },
-				getInstance: () => ({ run: async () => ({}) })
+				run: async () => ({})
 			}
 		};
 
-		const connections: Flowchart['connections'] = {
+		const connections: FlowchartDefinition['connections'] = {
 			conn1: {
 				from: { node: 'objectProducer', connector: 'obj' },
 				to: { node: 'objectConsumer', connector: 'obj' }
 			}
 		};
 
-		const result = validateConnections(connections, complexNodeClasses);
+		const result = validateConnections(connections, complexComponents);
 		expect(result.valid).toBe(false);
 		expect(result.errors[0]).toMatch(/Source schema has additional properties not defined in a strict destination schema/);
 	});

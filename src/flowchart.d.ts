@@ -1,23 +1,19 @@
 import type { Schema, ObjectSchema } from './schema.d';
 
-export type Flowchart = {
-	nodes: Record<string, Node>;
+export type FlowchartDefinition = {
+	nodes: Record<string, NodeDefinition>;
 	connections: Record<string, Connection>;
 };
 
-export type Node = {
+export type NodeDefinition = {
 	type: string;
 	settings: any;
 };
 
-export interface NodeClass {
-	inputs: Record<string, Schema>;
-	outputs: Record<string, Schema>;
-	settings: Schema;
-	getInstance(settings: any, /* outputs */): NodeInstance;
-}
-
-export interface NodeInstance {
+export interface Component {
+	readonly inputs: Record<string, Schema>;
+	readonly outputs: Record<string, Schema>;
+	readonly settings: Schema;
 	run(values: Record<string, any>): Promise<Record<string, any> | void>;
 }
 
