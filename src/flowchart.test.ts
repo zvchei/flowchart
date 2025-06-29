@@ -81,7 +81,7 @@ describe('Flowchart', () => {
 			try {
 				flowchart.addNode(nodeId, node);
 			} catch (error) {
-				expect(error).toEqual({ code: 'DUPLICATE_NODE_ID' });
+				expect(error).toEqual({ code: 'DUPLICATE_NODE_ID', id: nodeId });
 			}
 		});
 
@@ -92,14 +92,16 @@ describe('Flowchart', () => {
 				settings: { option: 'invalid' } // Assuming 'invalid' is not a valid setting
 			};
 
-			jest.spyOn(mockComponentRegistry, 'getInstance').mockImplementation(() => {
-				throw { code: 'INVALID_NODE_SETTINGS' };
-			});
+			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(null);
 
 			try {
 				flowchart.addNode(nodeId, node);
 			} catch (error) {
-				expect(error).toEqual({ code: 'INVALID_NODE_SETTINGS' });
+				expect(error).toEqual({
+					code: 'INVALID_NODE_SETTINGS',
+					id: nodeId,
+					details: [{ property: 'type', value: 'test' }]
+				});
 			}
 
 			expect(flowchart.getNode(nodeId)).toBeUndefined();
@@ -167,6 +169,7 @@ describe('Flowchart', () => {
 			} catch (error) {
 				expect(error).toEqual({
 					code: 'INVALID_CONNECTION_SETTINGS',
+					id: 'invalid-connection',
 					details: [{ property: 'from.node', value: invalidConnection.from.node }]
 				});
 			}
@@ -183,13 +186,88 @@ describe('Flowchart', () => {
 			} catch (error) {
 				expect(error).toEqual({
 					code: 'INVALID_CONNECTION_SETTINGS',
+					id: 'invalid-connection',
 					details: [{ property: 'to.node', value: invalidConnection.to.node }]
 				});
 			}
 		});
 
-		it('should validate connection compatibility', () => {
-			// ...
+		it('should throw an error for non-existent source connector', () => {
+			const invalidConnection: Connection = {
+				from: { node: 'node1', connector: 'non-existent-connector' },
+				to: { node: 'node2', connector: 'input21' }
+			};
+
+			try {
+				flowchart.addConnection('invalid-connection', invalidConnection);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_CONNECTION_SETTINGS',
+					id: 'invalid-connection',
+					details: [{ property: 'from.connector', value: 'non-existent-connector' }]
+				});
+			}
+		});
+
+		it('should throw an error for non-existent destination connector', () => {
+			const invalidConnection: Connection = {
+				from: { node: 'node1', connector: 'output11' },
+				to: { node: 'node2', connector: 'non-existent-connector' }
+			};
+
+			try {
+				flowchart.addConnection('invalid-connection', invalidConnection);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_CONNECTION_SETTINGS',
+					id: 'invalid-connection',
+					details: [{ property: 'to.connector', value: 'non-existent-connector' }]
+				});
+			}
+		});
+
+		it('should throw INCOMPATIBLE_CONNECTORS error for schema incompatibility', () => {
+			// Create components with incompatible schemas
+			const stringOutputComponent: Component = {
+				inputs: { input11: { type: 'string' } },
+				outputs: { output11: { type: 'string' } },
+				settings: { type: 'any' },
+				run: jest.fn().mockResolvedValue({})
+			};
+
+			const numberInputComponent: Component = {
+				inputs: { input21: { type: 'number' } },
+				outputs: {},
+				settings: { type: 'any' },
+				run: jest.fn().mockResolvedValue({})
+			};
+
+			jest.spyOn(mockComponentRegistry, 'getInstance').mockImplementation((type) => {
+				if (type === 'string-output') return stringOutputComponent;
+				if (type === 'number-input') return numberInputComponent;
+				throw undefined;
+			});
+
+			const stringOutputNode: NodeDefinition = { type: 'string-output', settings: {} };
+			const numberInputNode: NodeDefinition = { type: 'number-input', settings: {} };
+
+			flowchart.addNode('string-output-1', stringOutputNode);
+			flowchart.addNode('number-input-1', numberInputNode);
+
+			const incompatibleConnection: Connection = {
+				from: { node: 'string-output-1', connector: 'output11' },
+				to: { node: 'number-input-1', connector: 'input21' }
+			};
+
+			try {
+				flowchart.addConnection('incompatible-connection', incompatibleConnection);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INCOMPATIBLE_CONNECTORS',
+					id: 'incompatible-connection',
+					errors: [{ message: "Incompatible types: 'string' cannot be assigned to 'number'" }]
+				});
+			}
 		});
 	});
 

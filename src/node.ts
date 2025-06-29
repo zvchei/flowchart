@@ -10,7 +10,7 @@ export class NodeInstance {
 
 	constructor(
 		private readonly id: string,
-		private component: Component,
+		private readonly component: Component,
 		private outputs: Record<string, OutputSink[]>
 	) {
 		// TODO: Improved error handling
@@ -20,6 +20,11 @@ export class NodeInstance {
 			throw new Error(`Node ${id} must have at least one input.`);
 		}
 		this.payload = new Payload(inputs);
+	}
+
+	get schema() {
+		const {inputs, outputs} = this.component;
+		return {inputs, outputs} as const;
 	}
 
 	async input(name: string, data?: any): Promise<void> {

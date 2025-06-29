@@ -3,108 +3,135 @@ import type { NodeDefinition, Component, Connection, FlowchartDefinition } from 
 import { NodeInstance, OutputSink } from './node';
 import { compileSchema } from 'json-schema-library';
 import * as flowchartSchema from './flowchart.schema.json';
+import { areSchemasCompatible } from './schema';
 
 interface ComponentRegistry {
-    getInstance(nodeType: string, settings: any): Component;
+	getInstance(nodeType: string, settings: any): Component;
 }
 
 export class Flowchart {
-    private nodes: Record<string, NodeInstance> = {};
-    private outputs: Record<string, Record<string, OutputSink[]>> = {};
-    private outputSinks: Map<string, OutputSink> = new Map();
+	private nodes: Record<string, NodeInstance> = {};
+	private outputs: Record<string, Record<string, OutputSink[]>> = {};
+	private outputSinks: Map<string, OutputSink> = new Map();
 
-    constructor(
-        private componentRegistry: ComponentRegistry
-    ) {
-        // TODO: Implement flowchart construction logic
-    }
+	constructor(
+		private componentRegistry: ComponentRegistry
+	) {
+		// TODO: Implement flowchart construction logic
+	}
 
-    static fromJson(componentRegistry: ComponentRegistry, flowchartData: FlowchartDefinition): Flowchart {
-        // Validate the flowchart data against the schema
-        const schema = compileSchema(flowchartSchema);
-        const { valid, errors } = schema.validate(flowchartData);
+	private validateConnection(id: string, { from, to }: Connection) {
+		const source = this.nodes[from.node];
+		const destination = this.nodes[to.node];
 
-        if (!valid) {
-            throw {
-                code: 'INVALID_FLOWCHART_SCHEMA',
-                errors
-            } as FlowchartError;
-        }
+		let details: FlowchartError['details'] = [];
 
-        const flowchart = new Flowchart(componentRegistry);
-        flowchart.loadFromDefinition(flowchartData);
-        return flowchart;
-    }
+		if (!source) {
+			details.push({ property: 'from.node', value: from.node });
+		}
 
-    private loadFromDefinition(flowchartData: FlowchartDefinition): void {
-        for (const [nodeId, nodeDefinition] of Object.entries(flowchartData.nodes)) {
-            this.addNode(nodeId, nodeDefinition);
-        }
+		if (!destination) {
+			details.push({ property: 'to.node', value: to.node });
+		}
 
-        for (const [connectionId, connection] of Object.entries(flowchartData.connections)) {
-            this.addConnection(connectionId, connection);
-        }
-    }
+		if (source && !source.schema.outputs[from.connector]) {
+			details.push({ property: 'from.connector', value: from.connector });
+		}
 
-    addNode(nodeId: string, node: NodeDefinition): void {
-        if (this.nodes[nodeId]) {
-            throw { code: 'DUPLICATE_NODE_ID' } as FlowchartError;
-        }
+		if (destination && !destination.schema.inputs[to.connector]) {
+			details.push({ property: 'to.connector', value: to.connector });
+		}
 
-        const component = this.componentRegistry.getInstance(node.type, node.settings);
-        if (!component) {
-            throw {
-                code: 'INVALID_NODE_SETTINGS',
-                details: [{ property: 'type', value: node.type }]
-            } as FlowchartError;
-        }
+		if (details.length > 0) {
+			throw {
+				code: 'INVALID_CONNECTION_SETTINGS',
+				id,
+				details
+			} as FlowchartError;
+		}
 
-        if (!this.outputs[nodeId]) {
-            this.outputs[nodeId] = {};
-        }
+		const sourceSchema = source.schema.outputs[from.connector];
+		const destSchema = destination.schema.inputs[to.connector];
 
-        const nodeInstance = new NodeInstance(nodeId, component, this.outputs[nodeId]);
-        this.nodes[nodeId] = nodeInstance;
-    }
+		const { compatible, errors } = areSchemasCompatible(sourceSchema, destSchema);
+		if (!compatible) {
+			throw {
+				code: 'INCOMPATIBLE_CONNECTORS',
+				id,
+				errors: errors.map(error => ({ message: error })),
+			} as FlowchartError;
+		}
+	}
 
-    getNode(nodeId: string): NodeInstance | undefined {
-        return this.nodes[nodeId];
-    }
+	static fromJson(componentRegistry: ComponentRegistry, flowchartData: FlowchartDefinition): Flowchart {
+		// Validate the flowchart data against the schema
+		const schema = compileSchema(flowchartSchema);
+		const { valid, errors } = schema.validate(flowchartData);
 
-    addConnection(id: string, {from, to}: Connection): void {
-        const source = this.nodes[from.node];
-        const destination = this.nodes[to.node];
+		if (!valid) {
+			throw {
+				code: 'INVALID_FLOWCHART_SCHEMA',
+				errors
+			} as FlowchartError;
+		}
 
-        let details: FlowchartError['details'] = [];
+		const flowchart = new Flowchart(componentRegistry);
+		flowchart.loadFromDefinition(flowchartData);
+		return flowchart;
+	}
 
-        if (!source) {
-            details.push({ property: 'from.node', value: from.node });
-        }
+	private loadFromDefinition(flowchartData: FlowchartDefinition): void {
+		for (const [nodeId, nodeDefinition] of Object.entries(flowchartData.nodes)) {
+			this.addNode(nodeId, nodeDefinition);
+		}
 
-        if (!destination) {
-            details.push({ property: 'to.node', value: to.node });
-        }
+		for (const [connectionId, connection] of Object.entries(flowchartData.connections)) {
+			this.addConnection(connectionId, connection);
+		}
+	}
 
-        if (details.length > 0) {
-            throw {
-                code: 'INVALID_CONNECTION_SETTINGS',
-                details
-            } as FlowchartError;
-        }
+	addNode(id: string, node: NodeDefinition): void {
+		if (this.nodes[id]) {
+			throw { code: 'DUPLICATE_NODE_ID', id } as FlowchartError;
+		}
 
-        if (!this.outputs[from.node][from.connector]) {
-            this.outputs[from.node][from.connector] = [];
-        }
+		const component = this.componentRegistry.getInstance(node.type, node.settings);
+		if (!component) {
+			throw {
+				code: 'INVALID_NODE_SETTINGS',
+				id,
+				details: [{ property: 'type', value: node.type }]
+			} as FlowchartError;
+		}
 
-        const sink = async (value: any) => {
-            await destination.input(to.connector, value);
-        };
+		if (!this.outputs[id]) {
+			this.outputs[id] = {};
+		}
 
-        this.outputSinks.set(id, sink);
-        this.outputs[from.node][from.connector].push(sink);
-    }
+		const nodeInstance = new NodeInstance(id, component, this.outputs[id]);
+		this.nodes[id] = nodeInstance;
+	}
 
-    removeConnection(id: string): void {
-        // ...
-    }
+	getNode(nodeId: string): NodeInstance | undefined {
+		return this.nodes[nodeId];
+	}
+
+	addConnection(id: string, { from, to }: Connection): void {
+		this.validateConnection(id, { from, to });
+
+		if (!this.outputs[from.node][from.connector]) {
+			this.outputs[from.node][from.connector] = [];
+		}
+
+		const sink = async (value: any) => {
+			await this.nodes[to.node].input(to.connector, value);
+		};
+
+		this.outputSinks.set(id, sink);
+		this.outputs[from.node][from.connector].push(sink);
+	}
+
+	removeConnection(id: string): void {
+		// ...
+	}
 }

@@ -331,4 +331,18 @@ describe('NodeInstance', () => {
 			expect(mockSink2).toHaveBeenCalledWith(complexOutput.result2);
 		});
 	});
+
+	describe('get schema', () => {
+		it('should return the component schema', () => {
+			const instance = new NodeInstance(
+				'test-node',
+				mockComponent,
+				{ result1: [mockSink1] }
+			);
+
+			const schema = instance.schema;
+			expect(schema.inputs).toEqual(mockComponent.inputs);
+			expect(schema.outputs).toEqual(mockComponent.outputs);
+		});
+	});
 });
