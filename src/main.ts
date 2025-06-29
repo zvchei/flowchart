@@ -67,17 +67,7 @@ async function runFlowchart(flowchartPath: string, input?: string) {
 		const flowchartData = JSON.parse(fs.readFileSync(flowchartPath, 'utf-8')) as FlowchartDefinition;
 
 		const componentRegistry = new ComponentRegistry();
-		const flowchart = new Flowchart(componentRegistry);
-
-		for (const [nodeId, nodeDefinition] of Object.entries(flowchartData.nodes)) {
-			console.log(`Adding node: ${nodeId} (${nodeDefinition.type})`);
-			flowchart.addNode(nodeId, nodeDefinition);
-		}
-
-		for (const [connectionId, connection] of Object.entries(flowchartData.connections)) {
-			console.log(`Adding connection: ${connectionId}`);
-			flowchart.addConnection(connectionId, connection);
-		}
+		const flowchart = Flowchart.fromJson(componentRegistry, flowchartData);
 
 		const entryNodes = findEntryNodes(flowchartData);
 		console.log(`Found entry nodes: ${entryNodes.join(', ')}`);

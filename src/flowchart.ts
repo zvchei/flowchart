@@ -1,6 +1,8 @@
 import { FlowchartError } from './errors.d';
-import type { NodeDefinition, Component, Connection } from './flowchart.d';
+import type { NodeDefinition, Component, Connection, FlowchartDefinition } from './flowchart.d';
 import { NodeInstance, OutputSink } from './node';
+import { compileSchema } from 'json-schema-library';
+import * as flowchartSchema from './flowchart.schema.json';
 
 interface ComponentRegistry {
     getInstance(nodeType: string, settings: any): Component;
@@ -17,6 +19,33 @@ export class Flowchart {
         // TODO: Implement flowchart construction logic
     }
 
+    static fromJson(componentRegistry: ComponentRegistry, flowchartData: FlowchartDefinition): Flowchart {
+        // Validate the flowchart data against the schema
+        const schema = compileSchema(flowchartSchema);
+        const { valid, errors } = schema.validate(flowchartData);
+
+        if (!valid) {
+            throw {
+                code: 'INVALID_FLOWCHART_SCHEMA',
+                errors
+            } as FlowchartError;
+        }
+
+        const flowchart = new Flowchart(componentRegistry);
+        flowchart.loadFromDefinition(flowchartData);
+        return flowchart;
+    }
+
+    private loadFromDefinition(flowchartData: FlowchartDefinition): void {
+        for (const [nodeId, nodeDefinition] of Object.entries(flowchartData.nodes)) {
+            this.addNode(nodeId, nodeDefinition);
+        }
+
+        for (const [connectionId, connection] of Object.entries(flowchartData.connections)) {
+            this.addConnection(connectionId, connection);
+        }
+    }
+
     addNode(nodeId: string, node: NodeDefinition): void {
         if (this.nodes[nodeId]) {
             throw { code: 'DUPLICATE_NODE_ID' } as FlowchartError;
@@ -26,7 +55,7 @@ export class Flowchart {
         if (!component) {
             throw {
                 code: 'INVALID_NODE_SETTINGS',
-                details: { property: 'type', value: node.type }
+                details: [{ property: 'type', value: node.type }]
             } as FlowchartError;
         }
 
@@ -46,17 +75,20 @@ export class Flowchart {
         const source = this.nodes[from.node];
         const destination = this.nodes[to.node];
 
+        let details: FlowchartError['details'] = [];
+
         if (!source) {
-            throw {
-                code: 'INVALID_CONNECTION_SETTINGS',
-                details: { property: 'from', value: from }
-            } as FlowchartError;
+            details.push({ property: 'from.node', value: from.node });
         }
 
         if (!destination) {
+            details.push({ property: 'to.node', value: to.node });
+        }
+
+        if (details.length > 0) {
             throw {
                 code: 'INVALID_CONNECTION_SETTINGS',
-                details: { property: 'to', value: to }
+                details
             } as FlowchartError;
         }
 

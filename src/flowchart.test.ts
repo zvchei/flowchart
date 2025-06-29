@@ -1,6 +1,7 @@
 import { Flowchart } from './flowchart';
-import type { NodeDefinition, Component, Connection } from './flowchart.d';
+import type { NodeDefinition, Component, Connection, FlowchartDefinition } from './flowchart.d';
 import { NodeInstance } from './node';
+import { FlowchartError } from './errors.d';
 
 class MockComponentRegistry {
 	getInstance(nodeType: string, settings: any): Component {
@@ -166,7 +167,7 @@ describe('Flowchart', () => {
 			} catch (error) {
 				expect(error).toEqual({
 					code: 'INVALID_CONNECTION_SETTINGS',
-					details: { property: 'from', value: invalidConnection.from }
+					details: [{ property: 'from.node', value: invalidConnection.from.node }]
 				});
 			}
 		});
@@ -182,7 +183,7 @@ describe('Flowchart', () => {
 			} catch (error) {
 				expect(error).toEqual({
 					code: 'INVALID_CONNECTION_SETTINGS',
-					details: { property: 'to', value: invalidConnection.to }
+					details: [{ property: 'to.node', value: invalidConnection.to.node }]
 				});
 			}
 		});
@@ -195,4 +196,389 @@ describe('Flowchart', () => {
 	describe('flowchart execution', () => {
 		// ...
 	});
+
+	describe('fromJson', () => {
+		it('should create a flowchart from JSON definition and execute correctly', async () => {
+			const doublerComponent: Component = {
+				inputs: { number: { type: 'number' } },
+				outputs: { result: { type: 'number' } },
+				settings: { type: 'object' },
+				run: jest.fn().mockImplementation((values) => {
+					return Promise.resolve({ result: values.number * 2 });
+				})
+			};
+
+			const printerComponent: Component = {
+				inputs: { value: { type: 'number' } },
+				outputs: {},
+				settings: { type: 'object' },
+				run: jest.fn().mockResolvedValue({})
+			};
+
+			jest.spyOn(mockComponentRegistry, 'getInstance').mockImplementation((type) => {
+				if (type === 'doubler') return doublerComponent;
+				if (type === 'printer') return printerComponent;
+				throw new Error(`Unknown type: ${type}`);
+			});
+
+			const flowchartData = {
+				nodes: {
+					'doubler1': { type: 'doubler', settings: {} },
+					'printer1': { type: 'printer', settings: {} }
+				},
+				connections: {
+					'conn1': {
+						from: { node: 'doubler1', connector: 'result' },
+						to: { node: 'printer1', connector: 'value' }
+					}
+				}
+			};
+
+			const flowchart = Flowchart.fromJson(mockComponentRegistry, flowchartData);
+
+			expect(flowchart.getNode('doubler1')).toBeDefined();
+			expect(flowchart.getNode('printer1')).toBeDefined();
+
+			const doublerNode = flowchart.getNode('doubler1')!;
+			await doublerNode.input('number', 5);
+
+			expect(doublerComponent.run).toHaveBeenCalledWith({ number: 5 });
+			expect(printerComponent.run).toHaveBeenCalledWith({ value: 10 });
+		});
+
+		it('should validate valid flowchart schema', () => {
+			const validFlowchartData: FlowchartDefinition = {
+				nodes: {
+					'node1': { type: 'test', settings: {} }
+				},
+				connections: {
+					'conn1': {
+						from: { node: 'node1', connector: 'output1' },
+						to: { node: 'node1', connector: 'input1' }
+					}
+				}
+			};
+
+			const mockComponent: Component = {
+				inputs: { input1: { type: 'string' } },
+				outputs: { output1: { type: 'string' } },
+				settings: { type: 'object' },
+				run: jest.fn().mockResolvedValue({})
+			};
+
+			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponent);
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, validFlowchartData);
+			}).not.toThrow();
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for missing required fields', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': { type: 'test', settings: {} }
+				}
+				// Missing required 'connections' field
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for invalid node structure', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': {
+						// Missing required 'type' field
+						settings: {}
+					}
+				},
+				connections: {}
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for invalid connection structure', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': { type: 'test', settings: {} }
+				},
+				connections: {
+					'conn1': {
+						from: { node: 'node1', connector: 'output1' }
+						// Missing required 'to' field
+					}
+				}
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for invalid connector structure', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': { type: 'test', settings: {} }
+				},
+				connections: {
+					'conn1': {
+						from: {
+							node: 'node1'
+							// Missing required 'connector' field
+						},
+						to: { node: 'node1', connector: 'input1' }
+					}
+				}
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for additional properties', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': { type: 'test', settings: {} }
+				},
+				connections: {},
+				invalidProperty: 'should not be allowed'
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for invalid data types', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': {
+						type: 123, // Should be string
+						settings: {}
+					}
+				},
+				connections: {}
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+
+		it('should include validation errors in the thrown error', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': {
+						// Missing required 'type' field
+						settings: {}
+					}
+				},
+				connections: {}
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+				expect((error as FlowchartError).errors!.length).toBeGreaterThan(0);
+			}
+		});
+
+		it('should validate empty nodes and connections objects', () => {
+			const validFlowchartData: FlowchartDefinition = {
+				nodes: {},
+				connections: {}
+			};
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, validFlowchartData);
+			}).not.toThrow();
+		});
+
+		it('should validate multiple nodes and connections', () => {
+			const validFlowchartData: FlowchartDefinition = {
+				nodes: {
+					'node1': { type: 'source', settings: { value: 'test' } },
+					'node2': { type: 'processor', settings: {} },
+					'node3': { type: 'sink', settings: { destination: 'output' } }
+				},
+				connections: {
+					'conn1': {
+						from: { node: 'node1', connector: 'output' },
+						to: { node: 'node2', connector: 'input' }
+					},
+					'conn2': {
+						from: { node: 'node2', connector: 'output' },
+						to: { node: 'node3', connector: 'input' }
+					}
+				}
+			};
+
+			const mockComponent: Component = {
+				inputs: { input: { type: 'string' } },
+				outputs: { output: { type: 'string' } },
+				settings: { type: 'object' },
+				run: jest.fn().mockResolvedValue({})
+			};
+
+			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponent);
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, validFlowchartData);
+			}).not.toThrow();
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for invalid node additional properties', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': {
+						type: 'test',
+						settings: {},
+						invalidNodeProperty: 'not allowed'
+					}
+				},
+				connections: {}
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for invalid connection additional properties', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': { type: 'test', settings: {} }
+				},
+				connections: {
+					'conn1': {
+						from: { node: 'node1', connector: 'output1' },
+						to: { node: 'node1', connector: 'input1' },
+						invalidConnectionProperty: 'not allowed'
+					}
+				}
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+
+		it('should throw INVALID_FLOWCHART_SCHEMA error for invalid connector additional properties', () => {
+			const invalidFlowchartData = {
+				nodes: {
+					'node1': { type: 'test', settings: {} }
+				},
+				connections: {
+					'conn1': {
+						from: {
+							node: 'node1',
+							connector: 'output1',
+							invalidConnectorProperty: 'not allowed'
+						},
+						to: { node: 'node1', connector: 'input1' }
+					}
+				}
+			} as any;
+
+			expect(() => {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			}).toThrow();
+
+			try {
+				Flowchart.fromJson(mockComponentRegistry, invalidFlowchartData);
+			} catch (error) {
+				expect(error).toEqual({
+					code: 'INVALID_FLOWCHART_SCHEMA',
+					errors: expect.any(Array)
+				} as FlowchartError);
+			}
+		});
+	});
+
 });
