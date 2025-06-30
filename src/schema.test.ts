@@ -1,6 +1,16 @@
-import type { Schema } from './schema.d';
-import type { FlowchartDefinition, Component } from './flowchart.d';
-import { areSchemasCompatible, validateConnections } from './schema';
+import type { SchemaDefinition } from './schema.d';
+import { Schema } from './schema';
+
+// TODO: Check for missing tests (e.g. tuples, enums, etc.)
+// TODO: Add tests for Schema.validate()
+
+function areSchemasCompatible(from: SchemaDefinition, to: SchemaDefinition): { compatible: boolean; errors: string[] } {
+	const {compatible, errors} = Schema.from(from, 'test').checkCompatibilityWith(to);
+	return {
+		compatible,
+		errors: errors ? errors.map(error => `${error.locator}: ${error.message}`) : []
+	};
+}
 
 describe('areSchemasCompatible', () => {
 	let consoleWarnSpy: jest.SpyInstance;
@@ -14,41 +24,41 @@ describe('areSchemasCompatible', () => {
 	});
 
 	it('returns true for identical primitive types', () => {
-		const from: Schema = { type: 'string' };
-		const to: Schema = { type: 'string' };
+		const from: SchemaDefinition = { type: 'string' };
+		const to: SchemaDefinition = { type: 'string' };
 		expect(areSchemasCompatible(from, to)).toEqual({ compatible: true, errors: [] });
 	});
 
 	it('returns false for different types', () => {
-		const from: Schema = { type: 'string' };
-		const to: Schema = { type: 'object' };
+		const from: SchemaDefinition = { type: 'string' };
+		const to: SchemaDefinition = { type: 'object' };
 		const { compatible, errors } = areSchemasCompatible(from, to);
 		expect(compatible).toBe(false);
-		expect(errors[0]).toMatch(/Incompatible types: 'string' cannot be assigned to 'object'/);
+		expect(errors[0]).toMatch(/Schema of type 'string' cannot be assigned to 'object'/);
 	});
 
 	it('returns true for compatible arrays', () => {
-		const from: Schema = { type: 'array', items: { type: 'string' } };
-		const to: Schema = { type: 'array', items: { type: 'string' } };
+		const from: SchemaDefinition = { type: 'array', items: { type: 'string' } };
+		const to: SchemaDefinition = { type: 'array', items: { type: 'string' } };
 		expect(areSchemasCompatible(from, to)).toEqual({ compatible: true, errors: [] });
 	});
 
 	it('returns false for incompatible array item types', () => {
-		const from: Schema = { type: 'array', items: { type: 'string' } };
-		const to: Schema = { type: 'array', items: { type: 'number' } };
+		const from: SchemaDefinition = { type: 'array', items: { type: 'string' } };
+		const to: SchemaDefinition = { type: 'array', items: { type: 'number' } };
 		const result = areSchemasCompatible(from, to);
 		expect(result.compatible).toBe(false);
-		expect(result.errors[0]).toMatch(/Incompatible array item types/);
+		expect(result.errors[0]).toMatch(/Schema of type 'string' cannot be assigned to 'number'/);
 	});
 
 	it('returns true for compatible objects with required properties', () => {
-		const from: Schema = {
+		const from: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' }, bar: { type: 'number' } },
 			required: ['foo', 'bar'],
 			additionalProperties: false
 		};
-		const to: Schema = {
+		const to: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' }, bar: { type: 'number' } },
 			required: ['foo'],
@@ -59,13 +69,13 @@ describe('areSchemasCompatible', () => {
 	});
 
 	it('returns false if a required property is missing', () => {
-		const from: Schema = {
+		const from: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' } },
 			required: ['foo'],
 			additionalProperties: false
 		};
-		const to: Schema = {
+		const to: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' }, bar: { type: 'number' } },
 			required: ['foo', 'bar'],
@@ -73,15 +83,15 @@ describe('areSchemasCompatible', () => {
 		};
 		const result = areSchemasCompatible(from, to);
 		expect(result.compatible).toBe(false);
-		expect(result.errors).toEqual([`Required property 'bar' is missing in the source schema`]);
+		expect(result.errors).toEqual([`test: Required property 'bar' is missing in the source schema's list of required properties`]);
 	});
 
 	it('returns true for objects with no required properties', () => {
-		const from: Schema = {
+		const from: SchemaDefinition = {
 			type: 'object',
 			properties: { oof: { type: 'integer' } },
 		};
-		const to: Schema = {
+		const to: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' } },
 		};
@@ -89,11 +99,11 @@ describe('areSchemasCompatible', () => {
 	});
 
 	it('returns true for objects with compatible properties', () => {
-		const from: Schema = {
+		const from: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' } },
 		};
-		const to: Schema = {
+		const to: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' } },
 		};
@@ -101,29 +111,29 @@ describe('areSchemasCompatible', () => {
 	});
 
 	it('returns false for objects with incompatible properties', () => {
-		const from: Schema = {
+		const from: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' }, bar: { type: 'number' } },
 		};
-		const to: Schema = {
+		const to: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'number' }, bar: { type: 'integer' } },
 		};
 		const result = areSchemasCompatible(from, to);
 		expect(result.compatible).toBe(false);
 		expect(result.errors).toEqual([
-			`'foo': Incompatible types: 'string' cannot be assigned to 'number'`,
-			`'bar': Incompatible types: 'number' cannot be assigned to 'integer'`
+			`test.foo: Schema of type 'string' cannot be assigned to 'number'`,
+			`test.bar: Schema of type 'number' cannot be assigned to 'integer'`
 		]);
 	});
 
 	it('returns false for sources with extra properties in strict mode', () => {
-		const from: Schema = {
+		const from: SchemaDefinition = {
 			type: 'object',
 			required: ['foo'],
 			properties: { foo: { type: 'string' }, bar: { type: 'number' } },
 		};
-		const to: Schema = {
+		const to: SchemaDefinition = {
 			type: 'object',
 			properties: { foo: { type: 'string' } },
 			required: ['foo'],
@@ -131,6 +141,6 @@ describe('areSchemasCompatible', () => {
 		};
 		const result = areSchemasCompatible(from, to);
 		expect(result.compatible).toBe(false);
-		expect(result.errors).toEqual([`Source schema has additional properties not defined in a strict destination schema`]);
+		expect(result.errors).toEqual([`test: Source schema has properties not defined in the destination: bar`]);
 	});
 });

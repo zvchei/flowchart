@@ -1,4 +1,4 @@
-import type { Schema, ObjectSchema } from './schema.d';
+import type { SchemaDefinition, ObjectSchemaDefinition } from './schema.d';
 
 export type FlowchartDefinition = {
 	nodes: Record<string, NodeDefinition>;
@@ -11,15 +11,15 @@ export type NodeDefinition = {
 };
 
 export interface Component {
-	readonly inputs: Record<string, Schema>;
-	readonly outputs: Record<string, Schema>;
-	readonly settings: Schema;
+	readonly inputs: Record<string, SchemaDefinition>;
+	readonly outputs: Record<string, SchemaDefinition>;
+	readonly settings: SchemaDefinition;
 	run(values: Record<string, any>): Promise<Record<string, any> | void>;
 }
 
-export type Settings = ObjectSchema & {
-	required: ObjectSchema['required'];
-	properties: ObjectSchema['properties'];
+export type Settings = ObjectSchemaDefinition & {
+	required: ObjectSchemaDefinition['required'];
+	properties: ObjectSchemaDefinition['properties'];
 };
 
 export type Connection = {

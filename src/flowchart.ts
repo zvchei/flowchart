@@ -3,7 +3,7 @@ import type { NodeDefinition, Component, Connection, FlowchartDefinition } from 
 import { NodeInstance, OutputSink } from './node';
 import { compileSchema } from 'json-schema-library';
 import * as flowchartSchema from './flowchart.schema.json';
-import { areSchemasCompatible } from './schema';
+import { Schema } from './schema';
 
 interface ComponentRegistry {
 	getInstance(nodeType: string, settings: any): Component;
@@ -53,12 +53,13 @@ export class Flowchart {
 		const sourceSchema = source.schema.outputs[from.connector];
 		const destSchema = destination.schema.inputs[to.connector];
 
-		const { compatible, errors } = areSchemasCompatible(sourceSchema, destSchema);
+		const schema = Schema.from(sourceSchema, `${from.node}.outputs[${from.connector}]`);
+		const { compatible, errors } = schema.checkCompatibilityWith(destSchema);
 		if (!compatible) {
 			throw {
 				code: 'INCOMPATIBLE_CONNECTORS',
 				id,
-				errors: errors.map(error => ({ message: error })),
+				errors: errors.map(error => ({ message: `${error.locator}: ${error.message}` })),
 			} as FlowchartError;
 		}
 	}

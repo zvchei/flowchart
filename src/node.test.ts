@@ -1,21 +1,21 @@
 import { NodeInstance, OutputSink } from './node';
 import type { Component } from './flowchart.d';
-import { Schema } from './schema.d';
+import { SchemaDefinition } from './schema.d';
 
 class MockComponent implements Component {
 	constructor(private mockImplementation?: (values: Record<string, any>) => Promise<Record<string, any>>) { }
 
-	inputs: Record<string, Schema> = {
+	inputs: Record<string, SchemaDefinition> = {
 		input1: { type: 'string' },
 		input2: { type: 'string' }
 	};
 
-	outputs: Record<string, Schema> = {
+	outputs: Record<string, SchemaDefinition> = {
 		result1: { type: 'string' },
 		result2: { type: 'string' }
 	};
 
-	settings: Schema = {
+	settings: SchemaDefinition = {
 		type: 'object',
 		properties: {
 			setting1: { type: 'string' }

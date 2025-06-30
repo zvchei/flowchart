@@ -265,7 +265,9 @@ describe('Flowchart', () => {
 				expect(error).toEqual({
 					code: 'INCOMPATIBLE_CONNECTORS',
 					id: 'incompatible-connection',
-					errors: [{ message: "Incompatible types: 'string' cannot be assigned to 'number'" }]
+					errors: [{
+						message: "string-output-1.outputs[output11]: Schema of type 'string' cannot be assigned to 'number'"
+					}]
 				});
 			}
 		});

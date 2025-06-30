@@ -1,24 +1,44 @@
-export type ArraySchema = {
+import type { JsonError } from "json-schema-library";
+
+export type ArraySchemaDefinition = {
 	type: 'array';
-	items: {
-		type: string;
-	};
+	items: SchemaDefinition;
 };
 
-export type ObjectSchema = {
+export type TupleSchemaDefinition = {
+	type: 'tuple';
+	items: SchemaDefinition[];
+};
+
+export type EnumSchemaDefinition = {
+	type: 'enum';
+	enum: string[];
+};
+
+export type ObjectSchemaDefinition = {
 	type: 'object';
 	required?: string[];
-	properties?: Record<string, Schema>;
+	properties?: Record<string, SchemaDefinition>;
 	additionalProperties?: false;
 };
 
-export type Schema =
-| { type: 'any' } // Not defined in the JSON Schema specification, but very convenient.
-| { type: 'string' | 'boolean' | 'null' | 'integer' | 'number' }
-| ArraySchema
-| ObjectSchema;
+export type SchemaDefinition =
+	| { type: 'auto' } // Auto schemas mirror the type from the other end of the connection.
+	| { type: 'any' } // Not defined in the JSON Schema specification, but very convenient.
+	| { type: 'string' | 'boolean' | 'null' | 'integer' | 'number' }
+	| ArraySchemaDefinition
+	| ObjectSchemaDefinition
+	| TupleSchemaDefinition
+	| EnumSchemaDefinition;
 
-// TODO { type: 'auto' } for auto-mapping of types. Usefull for components that can handle multiple types, e.g. LLM
-// powered components with structured input/output. Note: a connection cannot have both ends with type 'auto'.
 
-// TODO: Define enums
+export type SchemaError = {
+	locator: string;
+	message: string;
+}
+
+export interface SchemaUtility {
+	readonly definition: SchemaDefinition;
+	checkCompatibilityWith(other: SchemaDefinition): { compatible: boolean; errors?: SchemaError[] };
+	validate(value: any): { valid: boolean; errors?: JsonError[] };
+}
