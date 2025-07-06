@@ -1,13 +1,56 @@
 {
+  "components": {
+    "text-decorator": {
+      "inputs": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "outputs": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "settings": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "enum",
+            "enum": ["uppercase", "lowercase"]
+          }
+        },
+        "required": ["mode"]
+      },
+      "code": {
+        "type": "inline",
+        "source": "const { text } = values; const { mode } = settings; const decoratedText = mode === 'uppercase' ? text.toUpperCase() : text.toLowerCase(); return { text: decoratedText };"
+      }
+    },
+    "printer": {
+      "inputs": {
+        "data": {
+          "type": "any"
+        }
+      },
+      "outputs": {},
+      "settings": {
+        "type": "null"
+      },
+      "code": {
+        "type": "inline",
+        "source": "console.log('Output:', values.data);"
+      }
+    }
+  },
   "nodes": {
     "start": {
-      "type": "textDecorator",
+      "type": "text-decorator",
       "settings": {
         "mode": "uppercase"
       }
     },
     "middle": {
-      "type": "textDecorator",
+      "type": "text-decorator",
       "settings": {
         "mode": "lowercase"
       }

@@ -1,47 +1,13 @@
 import type { Component, ComponentInstance, Runnable } from './flowchart.d';
 import { parseComponentConfiguration } from './schema';
 
-// Component definitions as JSON strings
-const textDecoratorComponentDef = `{
-	"inputs": {
-		"text": { "type": "string" }
-	},
-	"outputs": {
-		"text": { "type": "string" }
-	},
-	"settings": {
-		"type": "object",
-		"properties": {
-			"mode": { "type": "enum", "enum": ["uppercase", "lowercase"] }
-		},
-		"required": ["mode"]
-	},
-	"code": {
-		"type": "inline",
-		"source": "const { text } = values; const { mode } = settings; const decoratedText = mode === 'uppercase' ? text.toUpperCase() : text.toLowerCase(); return { text: decoratedText };"
-	}
-}`;
-
-const printerComponentDef = `{
-	"inputs": {
-		"data": { "type": "any" }
-	},
-	"outputs": {},
-	"settings": {
-		"type": "null"
-	},
-	"code": {
-		"type": "inline",
-		"source": "console.log('Output:', values.data);"
-	}
-}`;
-
 export class ComponentRegistry {
 	private components: Map<string, Component> = new Map();
 
 	constructor(private readonly runnableConstructor: (code: Component['code']) => Runnable = createRunFunction) {
-		this.registerComponent('textDecorator', parseComponentConfiguration(textDecoratorComponentDef));
-		this.registerComponent('printer', parseComponentConfiguration(printerComponentDef));
+		// OBSOLETE:
+		// this.registerComponent('textDecorator', parseComponentConfiguration(textDecoratorComponentDef));
+		// this.registerComponent('printer', parseComponentConfiguration(printerComponentDef));
 	}
 
 	getInstance(nodeType: string, settings: Record<string, any>): ComponentInstance {

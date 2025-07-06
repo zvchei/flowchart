@@ -1,6 +1,7 @@
 import type { SchemaDefinition, ObjectSchemaDefinition } from './schema.d';
 
 export type FlowchartDefinition = {
+	components?: Record<string, Component>;
 	nodes: Record<string, NodeConfiguration>;
 	connections: Record<string, Connection>;
 };
@@ -21,7 +22,7 @@ export interface Component {
 }
 
 export interface Runnable {
-	(values: Record<string, any>, setting: Record<string, any>): Promise<Record<string, any> | void>;
+	(values: Record<string, any>, settings: Record<string, any>): Promise<Record<string, any> | void>;
 }
 
 export interface ComponentInstance {

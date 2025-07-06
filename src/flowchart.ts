@@ -79,6 +79,12 @@ export class Flowchart {
 	}
 
 	private loadFromDefinition(flowchartData: FlowchartDefinition): void {
+		if (flowchartData.components) {
+			for (const [componentName, component] of Object.entries(flowchartData.components)) {
+				this.componentRegistry.registerComponent(componentName, component);
+			}
+		}
+
 		for (const [nodeId, NodeConfiguration] of Object.entries(flowchartData.nodes)) {
 			this.addNode(nodeId, NodeConfiguration);
 		}

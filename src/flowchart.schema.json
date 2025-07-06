@@ -68,6 +68,12 @@
 		}
 	},
 	"properties": {
+		"components": {
+			"type": "object",
+			"additionalProperties": {
+				"$ref": "component.schema.json"
+			}
+		},
 		"nodes": {
 			"type": "object",
 			"unevaluatedProperties": {

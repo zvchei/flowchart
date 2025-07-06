@@ -716,4 +716,5 @@ describe('Flowchart', () => {
 		});
 	});
 
+	// TODO: Tests for custom components
 });
