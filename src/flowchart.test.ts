@@ -1,20 +1,15 @@
 import { Flowchart } from './flowchart';
-import type { NodeConfiguration, Component, Connection, FlowchartDefinition } from './flowchart.d';
+import type { NodeConfiguration, Component, Connection, FlowchartDefinition, ComponentInstance, Runnable } from './flowchart.d';
 import { NodeInstance } from './node';
 import { FlowchartError } from './errors.d';
-
-class MockComponentRegistry {
-	getInstance(nodeType: string, settings: any): Component {
-		throw new Error('Stub method, not implemented');
-	}
-}
+import { ComponentRegistry } from './component-registry';
 
 describe('Flowchart', () => {
 	let flowchart: Flowchart;
-	let mockComponentRegistry: MockComponentRegistry;
+	let mockComponentRegistry: ComponentRegistry;
 
 	beforeEach(() => {
-		mockComponentRegistry = new MockComponentRegistry();
+		mockComponentRegistry = new ComponentRegistry();
 		flowchart = new Flowchart(mockComponentRegistry);
 	});
 
@@ -46,10 +41,16 @@ describe('Flowchart', () => {
 				inputs: { input1: { type: 'string' } },
 				outputs: {},
 				settings: { type: 'object' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
 			};
 
-			const getInstanceSpy = jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponent);
+			const mockComponentInstance: ComponentInstance = {
+				schema: mockComponent,
+				settings: { option: 'value' },
+				runnable: jest.fn().mockResolvedValue({})
+			};
+
+			const getInstanceSpy = jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponentInstance);
 
 			flowchart.addNode(nodeId, node);
 			expect(getInstanceSpy).toHaveBeenCalledWith(node.type, node.settings);
@@ -58,7 +59,7 @@ describe('Flowchart', () => {
 			expect(nodeInstance instanceof NodeInstance).toBe(true);
 
 			await nodeInstance!.input('input1', 'test data');
-			expect(mockComponent.run).toHaveBeenCalledWith({ input1: 'test data' });
+			expect(mockComponentInstance.runnable).toHaveBeenCalledWith({ input1: 'test data' }, { option: 'value' });
 		});
 
 		it('should prevent adding a node with duplicate ID', () => {
@@ -72,10 +73,16 @@ describe('Flowchart', () => {
 				inputs: { input1: { type: 'string' } },
 				outputs: {},
 				settings: { type: 'object' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
 			};
 
-			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponent);
+			const mockComponentInstance: ComponentInstance = {
+				schema: mockComponent,
+				settings: { option: 'value' },
+				runnable: jest.fn().mockResolvedValue({})
+			};
+
+			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponentInstance);
 			flowchart.addNode(nodeId, node);
 
 			try {
@@ -109,27 +116,39 @@ describe('Flowchart', () => {
 	});
 
 	describe('adding connections at runtime', () => {
-		let node1Component: Component;
-		let node2Component: Component;
+		let node1ComponentInstance: ComponentInstance;
+		let node2ComponentInstance: ComponentInstance;
 
 		beforeEach(() => {
-			node1Component = {
+			const node1Component: Component = {
 				inputs: { input11: { type: 'string' } },
 				outputs: { output11: { type: 'string' } },
 				settings: { type: 'any' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
 			};
 
-			node2Component = {
+			const node2Component: Component = {
 				inputs: { input21: { type: 'string' } },
 				outputs: {},
 				settings: { type: 'any' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
+			};
+
+			node1ComponentInstance = {
+				schema: node1Component,
+				settings: {},
+				runnable: jest.fn().mockResolvedValue({})
+			};
+
+			node2ComponentInstance = {
+				schema: node2Component,
+				settings: {},
+				runnable: jest.fn().mockResolvedValue({})
 			};
 
 			jest.spyOn(mockComponentRegistry, 'getInstance').mockImplementation((type) => {
-				if (type === 'source') return node1Component;
-				if (type === 'sink') return node2Component;
+				if (type === 'source') return node1ComponentInstance;
+				if (type === 'sink') return node2ComponentInstance;
 				throw undefined;
 			});
 
@@ -148,14 +167,14 @@ describe('Flowchart', () => {
 
 			flowchart.addConnection('connection1', connection);
 
-			const node1RunSpy = jest.spyOn(node1Component, 'run').mockResolvedValue({ output11: 'test data 2' });
-			const node2RunSpy = jest.spyOn(node2Component, 'run').mockResolvedValue({});
+			const node1RunSpy = jest.spyOn(node1ComponentInstance, 'runnable').mockResolvedValue({ output11: 'test data 2' });
+			const node2RunSpy = jest.spyOn(node2ComponentInstance, 'runnable').mockResolvedValue({});
 
 			const node1 = flowchart.getNode('node1')!;
 			await node1.input('input11', 'test data 1');
 
-			expect(node1RunSpy).toHaveBeenCalledWith({ input11: 'test data 1' });
-			expect(node2RunSpy).toHaveBeenCalledWith({ input21: 'test data 2' });
+			expect(node1RunSpy).toHaveBeenCalledWith({ input11: 'test data 1' }, {});
+			expect(node2RunSpy).toHaveBeenCalledWith({ input21: 'test data 2' }, {});
 		});
 
 		it('should throw an error for invalid connection settings', () => {
@@ -232,19 +251,31 @@ describe('Flowchart', () => {
 				inputs: { input11: { type: 'string' } },
 				outputs: { output11: { type: 'string' } },
 				settings: { type: 'any' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
 			};
 
 			const numberInputComponent: Component = {
 				inputs: { input21: { type: 'number' } },
 				outputs: {},
 				settings: { type: 'any' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
+			};
+
+			const stringOutputInstance: ComponentInstance = {
+				schema: stringOutputComponent,
+				settings: {},
+				runnable: jest.fn().mockResolvedValue({})
+			};
+
+			const numberInputInstance: ComponentInstance = {
+				schema: numberInputComponent,
+				settings: {},
+				runnable: jest.fn().mockResolvedValue({})
 			};
 
 			jest.spyOn(mockComponentRegistry, 'getInstance').mockImplementation((type) => {
-				if (type === 'string-output') return stringOutputComponent;
-				if (type === 'number-input') return numberInputComponent;
+				if (type === 'string-output') return stringOutputInstance;
+				if (type === 'number-input') return numberInputInstance;
 				throw undefined;
 			});
 
@@ -283,21 +314,33 @@ describe('Flowchart', () => {
 				inputs: { number: { type: 'number' } },
 				outputs: { result: { type: 'number' } },
 				settings: { type: 'object' },
-				run: jest.fn().mockImplementation((values) => {
-					return Promise.resolve({ result: values.number * 2 });
-				})
+				code: { type: 'inline', source: '...' }
 			};
 
 			const printerComponent: Component = {
 				inputs: { value: { type: 'number' } },
 				outputs: {},
 				settings: { type: 'object' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
+			};
+
+			const doublerInstance: ComponentInstance = {
+				schema: doublerComponent,
+				settings: {},
+				runnable: jest.fn().mockImplementation((values) => {
+					return Promise.resolve({ result: values.number * 2 });
+				})
+			};
+
+			const printerInstance: ComponentInstance = {
+				schema: printerComponent,
+				settings: {},
+				runnable: jest.fn().mockResolvedValue({})
 			};
 
 			jest.spyOn(mockComponentRegistry, 'getInstance').mockImplementation((type) => {
-				if (type === 'doubler') return doublerComponent;
-				if (type === 'printer') return printerComponent;
+				if (type === 'doubler') return doublerInstance;
+				if (type === 'printer') return printerInstance;
 				throw new Error(`Unknown type: ${type}`);
 			});
 
@@ -322,8 +365,8 @@ describe('Flowchart', () => {
 			const doublerNode = flowchart.getNode('doubler1')!;
 			await doublerNode.input('number', 5);
 
-			expect(doublerComponent.run).toHaveBeenCalledWith({ number: 5 });
-			expect(printerComponent.run).toHaveBeenCalledWith({ value: 10 });
+			expect(doublerInstance.runnable).toHaveBeenCalledWith({ number: 5 }, {});
+			expect(printerInstance.runnable).toHaveBeenCalledWith({ value: 10 }, {});
 		});
 
 		it('should validate valid flowchart schema', () => {
@@ -343,10 +386,16 @@ describe('Flowchart', () => {
 				inputs: { input1: { type: 'string' } },
 				outputs: { output1: { type: 'string' } },
 				settings: { type: 'object' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
 			};
 
-			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponent);
+			const mockComponentInstance: ComponentInstance = {
+				schema: mockComponent,
+				settings: {},
+				runnable: jest.fn().mockResolvedValue({})
+			};
+
+			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponentInstance);
 
 			expect(() => {
 				Flowchart.fromJson(mockComponentRegistry, validFlowchartData);
@@ -565,10 +614,16 @@ describe('Flowchart', () => {
 				inputs: { input: { type: 'string' } },
 				outputs: { output: { type: 'string' } },
 				settings: { type: 'object' },
-				run: jest.fn().mockResolvedValue({})
+				code: { type: 'inline', source: '...' }
 			};
 
-			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponent);
+			const mockComponentInstance: ComponentInstance = {
+				schema: mockComponent,
+				settings: {},
+				runnable: jest.fn().mockResolvedValue({})
+			};
+
+			jest.spyOn(mockComponentRegistry, 'getInstance').mockReturnValue(mockComponentInstance);
 
 			expect(() => {
 				Flowchart.fromJson(mockComponentRegistry, validFlowchartData);

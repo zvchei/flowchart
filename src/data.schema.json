@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema#",
+  "title": "SchemaDefinition",
+  "description": "JSON schema that describes the SchemaDefinition type used in the flowchart system",
+  "type": "object",
+  "oneOf": [
+    {
+      "$comment": "AutoSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "auto"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    {
+      "$comment": "AnySchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "any"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    {
+      "$comment": "PrimitiveSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": ["string", "boolean", "null", "integer", "number"]
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    {
+      "$comment": "ArraySchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "array"
+        },
+        "items": {
+          "$ref": "#"
+        }
+      },
+      "required": ["type", "items"],
+      "additionalProperties": false
+    },
+    {
+      "$comment": "TupleSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "tuple"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#"
+          }
+        }
+      },
+      "required": ["type", "items"],
+      "additionalProperties": false
+    },
+    {
+      "$comment": "EnumSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "enum"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["type", "enum"],
+      "additionalProperties": false
+    },
+    {
+      "$comment": "ObjectSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "object"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#"
+          }
+        },
+        "additionalProperties": {
+          "const": false
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    }
+  ]
+}

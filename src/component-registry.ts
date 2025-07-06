@@ -1,59 +1,74 @@
-import type { Component } from './flowchart.d';
+import type { Component, ComponentInstance, Runnable } from './flowchart.d';
+import { parseComponentConfiguration } from './schema';
 
-class TextDecoratorComponent implements Component {
-	readonly inputs = {
-		text: { type: 'string' as const }
-	};
-
-	readonly outputs = {
-		text: { type: 'string' as const }
-	};
-
-	readonly settings = {
-		type: 'object' as const,
-		properties: {
-			mode: { type: 'string' as const, enum: ['uppercase', 'lowercase'] }
+// Component definitions as JSON strings
+const textDecoratorComponentDef = `{
+	"inputs": {
+		"text": { "type": "string" }
+	},
+	"outputs": {
+		"text": { "type": "string" }
+	},
+	"settings": {
+		"type": "object",
+		"properties": {
+			"mode": { "type": "enum", "enum": ["uppercase", "lowercase"] }
 		},
-		required: ['mode']
-	};
-
-	constructor(private config: { mode: 'uppercase' | 'lowercase' }) { }
-
-	async run(values: Record<string, any>): Promise<Record<string, any>> {
-		const text = values.text as string;
-		const decoratedText = this.config.mode === 'uppercase'
-			? text.toUpperCase()
-			: text.toLowerCase();
-
-		return { text: decoratedText };
+		"required": ["mode"]
+	},
+	"code": {
+		"type": "inline",
+		"source": "const { text } = values; const { mode } = settings; const decoratedText = mode === 'uppercase' ? text.toUpperCase() : text.toLowerCase(); return { text: decoratedText };"
 	}
-}
+}`;
 
-class PrinterComponent implements Component {
-	readonly inputs = {
-		data: { type: 'any' as const }
-	};
-
-	readonly outputs = {};
-
-	readonly settings = {
-		type: 'null' as const
-	};
-
-	async run(values: Record<string, any>): Promise<void> {
-		console.log('Output:', values.data);
+const printerComponentDef = `{
+	"inputs": {
+		"data": { "type": "any" }
+	},
+	"outputs": {},
+	"settings": {
+		"type": "null"
+	},
+	"code": {
+		"type": "inline",
+		"source": "console.log('Output:', values.data);"
 	}
-}
+}`;
 
 export class ComponentRegistry {
-	getInstance(nodeType: string, settings: any): Component {
-		switch (nodeType) {
-			case 'textDecorator':
-				return new TextDecoratorComponent(settings);
-			case 'printer':
-				return new PrinterComponent();
-			default:
-				throw new Error(`Unknown component type: ${nodeType}`);
-		}
+	private components: Map<string, Component> = new Map();
+
+	constructor(private readonly runnableConstructor: (code: Component['code']) => Runnable = createRunFunction) {
+		this.registerComponent('textDecorator', parseComponentConfiguration(textDecoratorComponentDef));
+		this.registerComponent('printer', parseComponentConfiguration(printerComponentDef));
 	}
+
+	getInstance(nodeType: string, settings: Record<string, any>): ComponentInstance {
+		const component = this.components.get(nodeType);
+		if (!component) {
+			throw new Error(`Unknown component type: ${nodeType}`);
+		}
+		return { schema: component, settings, runnable: this.runnableConstructor(component.code) };
+	}
+
+	registerComponent(name: string, component: Component): void {
+		this.components.set(name, component);
+	}
+}
+
+function createRunFunction(code: Component['code']): Runnable {
+	if (code.type === 'external' || code.type === 'flowchart') {
+		throw new Error('External and Flowchart-based components not yet implemented');
+	}
+
+	const functionBody = code.source;
+	const asyncFunction = `return (async() => {${functionBody}})()`;
+
+	const runnable = new Function('values', 'settings', asyncFunction);
+
+	return async (values: Record<string, any>, settings: Record<string, any>) => {
+		const result = runnable(values, settings);
+		return result;
+	};
 }

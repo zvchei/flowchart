@@ -14,7 +14,20 @@ export interface Component {
 	readonly inputs: Record<string, SchemaDefinition>;
 	readonly outputs: Record<string, SchemaDefinition>;
 	readonly settings: SchemaDefinition;
-	run(values: Record<string, any>): Promise<Record<string, any> | void>;
+	readonly code: {
+		type: 'inline' | 'external' | 'flowchart';
+		source: string;
+	};
+}
+
+export interface Runnable {
+	(values: Record<string, any>, setting: Record<string, any>): Promise<Record<string, any> | void>;
+}
+
+export interface ComponentInstance {
+	schema: Component;
+	settings: Record<string, any>;
+	runnable: Runnable;
 }
 
 export interface Node {

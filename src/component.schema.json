@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema#",
+  "title": "Component",
+  "description": "JSON schema that describes the Component type used in the flowchart system",
+  "type": "object",
+  "properties": {
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "data.schema.json"
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "data.schema.json"
+      }
+    },
+    "settings": {
+      "$ref": "data.schema.json"
+    },
+    "code": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": ["inline", "external", "flowchart"]
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": ["type", "source"]
+    }
+  },
+  "required": ["inputs", "outputs", "settings", "code"],
+  "additionalProperties": false
+}

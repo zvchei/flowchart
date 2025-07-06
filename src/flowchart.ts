@@ -1,13 +1,10 @@
 import { FlowchartError } from './errors.d';
-import type { NodeConfiguration, Component, Connection, FlowchartDefinition } from './flowchart.d';
+import type { NodeConfiguration, Connection, FlowchartDefinition } from './flowchart.d';
 import { NodeInstance, OutputSink } from './node';
 import { compileSchema } from 'json-schema-library';
 import * as flowchartSchema from './flowchart.schema.json';
 import { Schema } from './schema';
-
-interface ComponentRegistry {
-	getInstance(nodeType: string, settings: any): Component;
-}
+import { ComponentRegistry } from './component-registry';
 
 export class Flowchart {
 	private nodes: Record<string, NodeInstance> = {};

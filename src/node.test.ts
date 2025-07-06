@@ -1,34 +1,41 @@
 import { NodeInstance, OutputSink } from './node';
-import type { Component } from './flowchart.d';
-import { SchemaDefinition } from './schema.d';
+import type { Component, ComponentInstance, Runnable } from './flowchart.d';
 
-class MockComponent implements Component {
+class MockComponent implements ComponentInstance {
 	constructor(private mockImplementation?: (values: Record<string, any>) => Promise<Record<string, any>>) { }
 
-	inputs: Record<string, SchemaDefinition> = {
-		input1: { type: 'string' },
-		input2: { type: 'string' }
-	};
-
-	outputs: Record<string, SchemaDefinition> = {
-		result1: { type: 'string' },
-		result2: { type: 'string' }
-	};
-
-	settings: SchemaDefinition = {
-		type: 'object',
-		properties: {
-			setting1: { type: 'string' }
+	schema: Component = {
+		inputs: {
+			input1: { type: 'string' },
+			input2: { type: 'string' }
 		},
-		required: ['setting1']
+		outputs: {
+			result1: { type: 'string' },
+			result2: { type: 'string' }
+		},
+		settings: {
+			type: 'object',
+			properties: {
+				setting1: { type: 'string' }
+			},
+			required: ['setting1']
+		},
+		code: {
+			type: 'inline',
+			source: '...'
+		}
 	};
 
-	async run(values: Record<string, any>): Promise<Record<string, any>> {
+	settings: Record<string, any> = {
+		setting1: 'test'
+	};
+
+	runnable: Runnable = async (values: Record<string, any>) => {
 		if (this.mockImplementation) {
 			return await this.mockImplementation(values);
 		}
 		return Promise.resolve({ result1: 'result output 1', result2: 'result output 2' });
-	}
+	};
 }
 
 describe('NodeInstance', () => {
@@ -341,8 +348,8 @@ describe('NodeInstance', () => {
 			);
 
 			const schema = instance.schema;
-			expect(schema.inputs).toEqual(mockComponent.inputs);
-			expect(schema.outputs).toEqual(mockComponent.outputs);
+			expect(schema.inputs).toEqual(mockComponent.schema.inputs);
+			expect(schema.outputs).toEqual(mockComponent.schema.outputs);
 		});
 	});
 });

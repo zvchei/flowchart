@@ -2,6 +2,10 @@ import { compileSchema, type JsonError } from 'json-schema-library';
 import type {
 	EnumSchemaDefinition, ObjectSchemaDefinition, SchemaDefinition, SchemaError, SchemaUtility, TupleSchemaDefinition
 } from './schema.d';
+import type { Component } from './flowchart.d';
+
+import * as componentSchema from './component.schema.json';
+import * as dataSchema from './data.schema.json';
 
 export class Schema implements SchemaUtility {
 	constructor(readonly definition: SchemaDefinition, private readonly locator: string) { }
@@ -92,6 +96,22 @@ function areTuplesCompatible(source: TupleSchemaDefinition, destination: TupleSc
 	}, []);
 
 	return { compatible: errors.length === 0, errors };
+}
+
+export function parseComponentConfiguration(json: string): Component {
+	const definition = JSON.parse(json);
+
+	const schemaNode = compileSchema(componentSchema);
+	schemaNode.addRemoteSchema('data.schema.json', dataSchema);
+
+	// TODO: Errors in the component definition are hard to locate, as the oneOf the schema does not provide details.
+
+	const { valid, errors } = schemaNode.validate(definition);
+
+	if (!valid) {
+		throw new Error(`Invalid schema definition: ${errors.map(e => e.message).join(', ')}`);
+	}
+	return definition as Component;
 }
 
 function areEnumsCompatible(source: EnumSchemaDefinition, destination: EnumSchemaDefinition, locator: string)

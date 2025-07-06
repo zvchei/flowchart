@@ -1,4 +1,4 @@
-import type { Component, Node } from './flowchart.d';
+import type { ComponentInstance, Node } from './flowchart.d';
 import { Payload } from './payload';
 
 export interface OutputSink {
@@ -10,11 +10,11 @@ export class NodeInstance implements Node {
 
 	constructor(
 		private readonly id: string,
-		private readonly component: Component,
+		private readonly component: ComponentInstance,
 		private outputs: Record<string, OutputSink[]>
 	) {
 		// TODO: Improved error handling
-		const inputs = Object.keys(component.inputs || {});
+		const inputs = Object.keys(component.schema.inputs || {});
 
 		if (inputs?.length === 0) {
 			throw new Error(`Node ${id} must have at least one input.`);
@@ -23,8 +23,8 @@ export class NodeInstance implements Node {
 	}
 
 	get schema() {
-		const {inputs, outputs} = this.component;
-		return {inputs, outputs} as const;
+		const { inputs, outputs } = this.component.schema;
+		return { inputs, outputs } as const;
 	}
 
 	async input(name: string, data?: any): Promise<void> {
@@ -32,7 +32,7 @@ export class NodeInstance implements Node {
 
 		if (complete) {
 			const data = Object.fromEntries(this.payload.data);
-			const result = (await this.component.run(data)) || {};
+			const result = (await this.component.runnable(data, this.component.settings)) || {};
 
 			await this.output(result);
 

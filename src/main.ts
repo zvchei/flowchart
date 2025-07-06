@@ -22,7 +22,7 @@ async function runFlowchart(flowchartPath: string, input?: string) {
 		for (const nodeId of entryNodes) {
 			const node = flowchart.getNode(nodeId);
 			if (node) {
-				const inputNames = Object.keys(componentRegistry.getInstance(flowchartData.nodes[nodeId].type, flowchartData.nodes[nodeId].settings).inputs);
+				const inputNames = Object.keys(node.schema.inputs);
 				if (inputNames.length > 0) {
 					await node.input(inputNames[0], input);
 				}
