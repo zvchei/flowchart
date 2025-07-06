@@ -1,11 +1,11 @@
-import type { Component } from './flowchart.d';
+import type { Component, Node } from './flowchart.d';
 import { Payload } from './payload';
 
 export interface OutputSink {
 	(value: any): Promise<void>;
 }
 
-export class NodeInstance {
+export class NodeInstance implements Node {
 	private payload: Payload;
 
 	constructor(

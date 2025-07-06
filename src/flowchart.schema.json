@@ -43,7 +43,7 @@
 			},
 			"additionalProperties": false
 		},
-		"node": {
+		"node-configuration": {
 			"type": "object",
 			"required": [
 				"type"
@@ -56,6 +56,12 @@
 				"settings": {
 					"type": "object",
 					"$comment": "Settings for the instance in the node"
+				},
+				"inputs": {
+					"type": "object"
+				},
+				"outputs": {
+					"type": "object"
 				}
 			},
 			"additionalProperties": false
@@ -65,7 +71,7 @@
 		"nodes": {
 			"type": "object",
 			"unevaluatedProperties": {
-				"$ref": "#/$defs/node"
+				"$ref": "#/$defs/node-configuration"
 			}
 		},
 		"connections": {

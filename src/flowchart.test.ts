@@ -1,5 +1,5 @@
 import { Flowchart } from './flowchart';
-import type { NodeDefinition, Component, Connection, FlowchartDefinition } from './flowchart.d';
+import type { NodeConfiguration, Component, Connection, FlowchartDefinition } from './flowchart.d';
 import { NodeInstance } from './node';
 import { FlowchartError } from './errors.d';
 
@@ -37,7 +37,7 @@ describe('Flowchart', () => {
 	describe('addNode', () => {
 		it('should add a new node to the flowchart', async () => {
 			const nodeId = 'test-node-1';
-			const node: NodeDefinition = {
+			const node: NodeConfiguration = {
 				type: 'test',
 				settings: { option: 'value' }
 			};
@@ -63,7 +63,7 @@ describe('Flowchart', () => {
 
 		it('should prevent adding a node with duplicate ID', () => {
 			const nodeId = 'test-node-1';
-			const node: NodeDefinition = {
+			const node: NodeConfiguration = {
 				type: 'test',
 				settings: { option: 'value' }
 			};
@@ -87,7 +87,7 @@ describe('Flowchart', () => {
 
 		it('should validate node\'s settings before adding', () => {
 			const nodeId = 'test-node-2';
-			const node: NodeDefinition = {
+			const node: NodeConfiguration = {
 				type: 'test',
 				settings: { option: 'invalid' } // Assuming 'invalid' is not a valid setting
 			};
@@ -133,8 +133,8 @@ describe('Flowchart', () => {
 				throw undefined;
 			});
 
-			const node1: NodeDefinition = { type: 'source', settings: {} };
-			const node2: NodeDefinition = { type: 'sink', settings: {} };
+			const node1: NodeConfiguration = { type: 'source', settings: {} };
+			const node2: NodeConfiguration = { type: 'sink', settings: {} };
 
 			flowchart.addNode('node1', node1);
 			flowchart.addNode('node2', node2);
@@ -248,8 +248,8 @@ describe('Flowchart', () => {
 				throw undefined;
 			});
 
-			const stringOutputNode: NodeDefinition = { type: 'string-output', settings: {} };
-			const numberInputNode: NodeDefinition = { type: 'number-input', settings: {} };
+			const stringOutputNode: NodeConfiguration = { type: 'string-output', settings: {} };
+			const numberInputNode: NodeConfiguration = { type: 'number-input', settings: {} };
 
 			flowchart.addNode('string-output-1', stringOutputNode);
 			flowchart.addNode('number-input-1', numberInputNode);

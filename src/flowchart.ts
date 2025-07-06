@@ -1,5 +1,5 @@
 import { FlowchartError } from './errors.d';
-import type { NodeDefinition, Component, Connection, FlowchartDefinition } from './flowchart.d';
+import type { NodeConfiguration, Component, Connection, FlowchartDefinition } from './flowchart.d';
 import { NodeInstance, OutputSink } from './node';
 import { compileSchema } from 'json-schema-library';
 import * as flowchartSchema from './flowchart.schema.json';
@@ -82,8 +82,8 @@ export class Flowchart {
 	}
 
 	private loadFromDefinition(flowchartData: FlowchartDefinition): void {
-		for (const [nodeId, nodeDefinition] of Object.entries(flowchartData.nodes)) {
-			this.addNode(nodeId, nodeDefinition);
+		for (const [nodeId, NodeConfiguration] of Object.entries(flowchartData.nodes)) {
+			this.addNode(nodeId, NodeConfiguration);
 		}
 
 		for (const [connectionId, connection] of Object.entries(flowchartData.connections)) {
@@ -91,7 +91,7 @@ export class Flowchart {
 		}
 	}
 
-	addNode(id: string, node: NodeDefinition): void {
+	addNode(id: string, node: NodeConfiguration): void {
 		if (this.nodes[id]) {
 			throw { code: 'DUPLICATE_NODE_ID', id } as FlowchartError;
 		}
