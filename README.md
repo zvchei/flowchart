@@ -4,52 +4,39 @@ A TypeScript-based flowchart execution engine that interprets `.flowchart.json` 
 
 ## Overview
 
-A `.flowchart.json` file contains a JSON object that describes a set of processing nodes and the connections between them. The engine executes these flowcharts by creating component instances, connecting their inputs and outputs, and managing data flow through the graph.
-
-## Architecture
-
-### Flowchart Structure
-
-A flowchart consists of:
-
-- **Nodes**: Processing components with typed inputs, outputs, and configurable settings
+A `.flowchart.json` file contains a JSON object that describes a complete workflow system including:
+- **Components**: Reusable processing units with typed inputs, outputs, and JavaScript code
+- **Nodes**: Instances of components with specific settings 
 - **Connections**: Data flow definitions between node outputs and inputs
 
-## Current Implementation
+The engine executes these flowcharts by registering components, creating node instances, and managing typed data flow through the graph.
 
-This is a **CLI-only** prototype implementation limited to running the provided example flowchart.
+## Setup
+
+```bash
+npm install
+```
 
 ## Usage
 
-### Running a Flowchart
-
 ```bash
-# Interactive input
+# Interactive input (will prompt for input)
 npm start example.flowchart.json
 
-# Pipe input
+# Pipe input from echo
 echo "hello world" | npm start example.flowchart.json
 
-# File input
+# File input redirection
 npm start example.flowchart.json < input.txt
 ```
 
 ## Development
 
-### Testing
-
 ```bash
+# Run tests
 npm test
 ```
 
-### Type Checking
+### Configuration
 
-The project uses TypeScript with strict type checking and JSON Schema validation for runtime type safety.
-
-## Schema Validation
-
-The engine validates:
-- Node type compatibility
-- Connection type matching
-- Required property presence
-- JSON Schema compliance for all data types
+Components are defined within flowchart JSON files with typed inputs/outputs and code. The engine provides comprehensive JSON Schema validation for flowchart structure, component definitions, node configuration, and connection compatibility.
